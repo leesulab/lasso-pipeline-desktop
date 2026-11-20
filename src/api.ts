@@ -143,3 +143,55 @@ export async function fetchPipelineJobs(
 
   return jobs.map(mapJob);
 }
+
+export async function createPipelineJob(
+  backend: BackendStatus,
+  steps: string[],
+  projectName: string,
+): Promise<PipelineJob> {
+  const job = await apiRequest<ApiJobResponse>(
+    backend,
+    "/api/v1/jobs",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        steps,
+        parameters: {
+          project: projectName,
+        },
+      }),
+    },
+  );
+
+  return mapJob(job);
+}
+
+export async function runPipelineJob(
+  backend: BackendStatus,
+  jobId: string,
+): Promise<PipelineJob> {
+  const job = await apiRequest<ApiJobResponse>(
+    backend,
+    `/api/v1/jobs/${encodeURIComponent(jobId)}/run`,
+    {
+      method: "POST",
+    },
+  );
+
+  return mapJob(job);
+}
+
+export async function fetchPipelineJob(
+  backend: BackendStatus,
+  jobId: string,
+): Promise<PipelineJob> {
+  const job = await apiRequest<ApiJobResponse>(
+    backend,
+    `/api/v1/jobs/${encodeURIComponent(jobId)}`,
+  );
+
+  return mapJob(job);
+}
