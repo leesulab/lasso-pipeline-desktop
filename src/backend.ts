@@ -39,3 +39,31 @@ export async function stopBackend(): Promise<BackendStatus> {
     "stop_pipeline_backend",
   );
 }
+
+export type UploadDestination =
+  | "calibration"
+  | "databases"
+  | "blanks"
+  | "samples";
+
+export type UploadedPipelineFile = {
+  destination: UploadDestination;
+  filename: string;
+  sizeBytes: number;
+  relativePath: string;
+};
+
+export async function uploadPipelineFile(
+  jobId: string,
+  destination: UploadDestination,
+  filePath: string,
+): Promise<UploadedPipelineFile> {
+  return invoke<UploadedPipelineFile>(
+    "upload_pipeline_file",
+    {
+      jobId,
+      destination,
+      filePath,
+    },
+  );
+}
