@@ -18,6 +18,11 @@ import {
   Server,
   UploadCloud,
 } from "lucide-react";
+import {
+  createPipelineJob,
+  fetchPipelineJob,
+  runPipelineJob,
+} from "./api";
 import { usePipelineData } from "./usePipelineData";
 import "./App.css";
 
@@ -101,6 +106,13 @@ function App() {
 
   const [selectedSteps, setSelectedSteps] =
     useState<string[]>([]);
+  const [projectName, setProjectName] = useState(
+    "Nouvelle analyse locale",
+  );
+  const [jobActionPending, setJobActionPending] =
+    useState(false);
+  const [jobActionError, setJobActionError] =
+    useState<string | null>(null);
   const [view, setView] = useState<View>("overview");
 
   const runningJobs = useMemo(
@@ -173,6 +185,73 @@ function App() {
     } finally {
       setBackendActionPending(false);
       setBackendLoading(false);
+    }
+  }
+
+  async function createAndRunJob() {
+    if (
+      !backendStatus.running ||
+      selectedSteps.length === 0 ||
+      jobActionPending
+    ) {
+      return;
+    }
+
+    setJobActionPending(true);
+    setJobActionError(null);
+
+    try {
+      const createdJob = await createPipelineJob(
+        backendStatus,
+        selectedSteps,
+        projectName.trim() || "Analyse locale",
+      );
+
+      await refreshPipelineData();
+      setView("jobs");
+
+      await runPipelineJob(
+        backendStatus,
+        createdJob.jobId,
+      );
+
+      const pollingDeadline = Date.now() + 60_000;
+
+      while (Date.now() < pollingDeadline) {
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, 500);
+        });
+
+        const job = await fetchPipelineJob(
+          backendStatus,
+          createdJob.jobId,
+        );
+
+        await refreshPipelineData();
+
+        if (
+          job.status === "success" ||
+          job.status === "error"
+        ) {
+          if (job.status === "error") {
+            throw new Error(
+              job.error?.message ??
+                "La pipeline s'est terminée en erreur.",
+            );
+          }
+
+          return;
+        }
+      }
+
+      throw new Error(
+        "Le suivi du job a dépassé 60 secondes.",
+      );
+    } catch (error) {
+      setJobActionError(String(error));
+      await refreshPipelineData();
+    } finally {
+      setJobActionPending(false);
     }
   }
 
@@ -270,6 +349,13 @@ function App() {
         <div className="backend-error-panel">
           <strong>Impossible de charger les données</strong>
           <span>{pipelineDataError}</span>
+        </div>
+      )}
+
+      {jobActionError && (
+        <div className="backend-error-panel">
+          <strong>Échec de l’analyse</strong>
+          <span>{jobActionError}</span>
         </div>
       )}
 
@@ -407,6 +493,18 @@ function App() {
                 </div>
 
                 <article className="card pipeline-card">
+                  <label className="project-field">
+                    <span>Nom de l’analyse</span>
+                    <input
+                      type="text"
+                      value={projectName}
+                      onChange={(event) =>
+                        setProjectName(event.target.value)
+                      }
+                      placeholder="Ex. Campagne Seine · Lot 04"
+                    />
+                  </label>
+
                   <h3>Étapes de la pipeline</h3>
 
                   <div className="steps-grid">
@@ -442,14 +540,19 @@ function App() {
 
                     <button
                       className="button button-primary"
-                      disabled
-                      title={
-                        "La création de jobs sera raccordée " +
-                        "à l'API à l'étape suivante."
+                      disabled={
+                        !engineStarted ||
+                        selectedSteps.length === 0 ||
+                        jobActionPending
+                      }
+                      onClick={() =>
+                        void createAndRunJob()
                       }
                     >
                       <Play size={17} />
-                      Création API à connecter
+                      {jobActionPending
+                        ? "Analyse en cours…"
+                        : "Créer et lancer"}
                     </button>
                   </div>
                 </article>

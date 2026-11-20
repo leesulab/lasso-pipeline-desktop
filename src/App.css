@@ -562,3 +562,32 @@ button:disabled {
     transform: rotate(360deg);
   }
 }
+
+.project-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 22px;
+}
+
+.project-field span {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.project-field input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  padding: 9px 12px;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+}
+
+.project-field input:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgb(15 118 110 / 12%);
+}
