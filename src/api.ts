@@ -196,3 +196,39 @@ export async function fetchPipelineJob(
 
   return mapJob(job);
 }
+
+export type PipelineFileCategory =
+  | "input"
+  | "intermediate"
+  | "output"
+  | "log"
+  | "state"
+  | "metadata";
+
+export type PipelineFile = {
+  relativePath: string;
+  sizeBytes: number;
+  category: PipelineFileCategory;
+};
+
+type ApiFileResponse = {
+  relative_path: string;
+  size_bytes: number;
+  category: PipelineFileCategory;
+};
+
+export async function fetchPipelineFiles(
+  backend: BackendStatus,
+  jobId: string,
+): Promise<PipelineFile[]> {
+  const files = await apiRequest<ApiFileResponse[]>(
+    backend,
+    `/api/v1/jobs/${encodeURIComponent(jobId)}/files`,
+  );
+
+  return files.map((file) => ({
+    relativePath: file.relative_path,
+    sizeBytes: file.size_bytes,
+    category: file.category,
+  }));
+}
