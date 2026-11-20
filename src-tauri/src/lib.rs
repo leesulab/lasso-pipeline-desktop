@@ -350,6 +350,153 @@ fn stop_pipeline_backend(
     })
 }
 
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+struct UploadedPipelineFile {
+    destination: String,
+    filename: String,
+    size_bytes: u64,
+    relative_path: String,
+}
+
+fn validate_upload_destination(destination: &str) -> Result<(), String> {
+    match destination {
+        "samples" | "blanks" | "calibration" | "databases" => Ok(()),
+        _ => Err(format!("Destination de fichier interdite : {destination}")),
+    }
+}
+
+#[tauri::command]
+async fn upload_pipeline_file(
+    state: tauri::State<'_, PipelineBackendState>,
+    job_id: String,
+    destination: String,
+    file_path: String,
+) -> Result<UploadedPipelineFile, String> {
+    validate_upload_destination(&destination)?;
+
+    if job_id.trim().is_empty() {
+        return Err("L'identifiant du job est vide.".to_string());
+    }
+
+    let local_file = PathBuf::from(&file_path)
+        .canonicalize()
+        .map_err(|error| format!("Fichier local introuvable {file_path} : {error}"))?;
+
+    if !local_file.is_file() {
+        return Err(format!(
+            "Le chemin sélectionné n'est pas un fichier : {}",
+            local_file.display()
+        ));
+    }
+
+    let filename = local_file
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "Le nom du fichier n'est pas valide.".to_string())?
+        .to_string();
+
+    let file_size = tokio::fs::metadata(&local_file)
+        .await
+        .map_err(|error| {
+            format!(
+                "Impossible de lire les métadonnées de {} : \
+                 {error}",
+                local_file.display()
+            )
+        })?
+        .len();
+
+    // Copier les informations de connexion et libérer le
+    // Mutex avant toute opération réseau asynchrone.
+    let connection = {
+        let mut process_guard = state
+            .process
+            .lock()
+            .map_err(|_| "État du backend local inaccessible.".to_string())?;
+
+        let process = process_guard
+            .as_mut()
+            .ok_or_else(|| "Le moteur local n'est pas démarré.".to_string())?;
+
+        if process
+            .child
+            .try_wait()
+            .map_err(|error| {
+                format!(
+                    "Impossible de vérifier le backend : \
+                     {error}"
+                )
+            })?
+            .is_some()
+        {
+            return Err("Le moteur local s'est arrêté.".to_string());
+        }
+
+        process.connection.clone()
+    };
+
+    let file_part = reqwest::multipart::Part::file(&local_file)
+        .await
+        .map_err(|error| {
+            format!(
+                "Impossible d'ouvrir {} pour l'upload : \
+             {error}",
+                local_file.display()
+            )
+        })?
+        .file_name(filename.clone())
+        .mime_str("application/octet-stream")
+        .map_err(|error| format!("Type multipart invalide : {error}"))?;
+
+    let form = reqwest::multipart::Form::new()
+        .text("destination", destination)
+        .part("uploaded_file", file_part);
+
+    let url = format!("{}/api/v1/jobs/{}/files", connection.base_url, job_id,);
+
+    let response = reqwest::Client::new()
+        .post(url)
+        .bearer_auth(&connection.token)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|error| format!("Échec du transfert de {filename} : {error}"))?;
+
+    let response_status = response.status();
+
+    if !response_status.is_success() {
+        let response_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Réponse API illisible.".to_string());
+
+        return Err(format!(
+            "Upload refusé pour {filename} \
+             ({response_status}) : {response_text}"
+        ));
+    }
+
+    let uploaded = response
+        .json::<UploadedPipelineFile>()
+        .await
+        .map_err(|error| {
+            format!(
+                "Réponse d'upload invalide pour \
+                 {filename} : {error}"
+            )
+        })?;
+
+    if uploaded.size_bytes != file_size {
+        return Err(format!(
+            "Taille incohérente après l'upload de \
+             {filename} : local={file_size}, distant={}",
+            uploaded.size_bytes
+        ));
+    }
+
+    Ok(uploaded)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -360,6 +507,7 @@ pub fn run() {
             start_pipeline_backend,
             get_pipeline_backend_status,
             stop_pipeline_backend,
+            upload_pipeline_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
