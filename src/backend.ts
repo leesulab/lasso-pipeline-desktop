@@ -67,3 +67,31 @@ export async function uploadPipelineFile(
     },
   );
 }
+
+export async function openPipelineFile(
+  jobId: string,
+  relativePath: string,
+): Promise<void> {
+  await invoke(
+    "open_pipeline_file",
+    {
+      jobId,
+      relativePath,
+    },
+  );
+}
+
+export async function exportPipelineFile(
+  jobId: string,
+  relativePath: string,
+  destinationPath: string,
+): Promise<number> {
+  return invoke<number>(
+    "export_pipeline_file",
+    {
+      jobId,
+      relativePath,
+      destinationPath,
+    },
+  );
+}

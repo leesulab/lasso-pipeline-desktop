@@ -10,6 +10,7 @@ use std::{
     time::Duration,
 };
 use tauri::Manager;
+use tauri_plugin_opener::OpenerExt;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -497,6 +498,165 @@ async fn upload_pipeline_file(
     Ok(uploaded)
 }
 
+fn resolve_local_job_file(
+    state: &tauri::State<'_, PipelineBackendState>,
+    job_id: &str,
+    relative_path: &str,
+) -> Result<PathBuf, String> {
+    if job_id.trim().is_empty() {
+        return Err("L'identifiant du job est vide.".to_string());
+    }
+
+    let relative_file = PathBuf::from(relative_path);
+
+    if relative_file.is_absolute()
+        || relative_file.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::CurDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+    {
+        return Err("Chemin de fichier du job invalide.".to_string());
+    }
+
+    let jobs_directory = {
+        let process_guard = state
+            .process
+            .lock()
+            .map_err(|_| "État du backend local inaccessible.".to_string())?;
+
+        let process = process_guard
+            .as_ref()
+            .ok_or_else(|| "Le moteur local n'est pas démarré.".to_string())?;
+
+        process.jobs_dir.clone()
+    };
+
+    let job_directory = jobs_directory
+        .join(job_id)
+        .canonicalize()
+        .map_err(|error| format!("Dossier du job {job_id} introuvable : {error}"))?;
+
+    let target_file = job_directory
+        .join(&relative_file)
+        .canonicalize()
+        .map_err(|error| format!("Fichier {} introuvable : {error}", relative_path))?;
+
+    if !target_file.starts_with(&job_directory) {
+        return Err("Le fichier demandé sort du dossier du job.".to_string());
+    }
+
+    if !target_file.is_file() {
+        return Err(format!(
+            "Le chemin demandé n'est pas un fichier : {}",
+            target_file.display()
+        ));
+    }
+
+    if target_file
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.ends_with(".uploading"))
+    {
+        return Err("Un fichier temporaire ne peut pas être ouvert.".to_string());
+    }
+
+    Ok(target_file)
+}
+
+#[tauri::command]
+fn open_pipeline_file(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, PipelineBackendState>,
+    job_id: String,
+    relative_path: String,
+) -> Result<(), String> {
+    let target_file = resolve_local_job_file(&state, &job_id, &relative_path)?;
+
+    let target_path = target_file.to_string_lossy().into_owned();
+
+    app.opener()
+        .open_path(target_path, None::<&str>)
+        .map_err(|error| format!("Impossible d'ouvrir le fichier : {error}"))
+}
+
+#[tauri::command]
+async fn export_pipeline_file(
+    state: tauri::State<'_, PipelineBackendState>,
+    job_id: String,
+    relative_path: String,
+    destination_path: String,
+) -> Result<u64, String> {
+    let source_file = resolve_local_job_file(&state, &job_id, &relative_path)?;
+
+    let destination_file = PathBuf::from(destination_path);
+
+    if destination_file.as_os_str().is_empty() {
+        return Err("La destination d'export est vide.".to_string());
+    }
+
+    if let Some(parent_directory) = destination_file.parent() {
+        tokio::fs::create_dir_all(parent_directory)
+            .await
+            .map_err(|error| {
+                format!(
+                    "Impossible de créer le dossier \
+                     d'export {} : {error}",
+                    parent_directory.display()
+                )
+            })?;
+    }
+
+    let temporary_file = destination_file.with_extension(format!(
+        "{}.exporting",
+        destination_file
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or("")
+    ));
+
+    let copy_result = tokio::fs::copy(&source_file, &temporary_file).await;
+
+    let copied_bytes = match copy_result {
+        Ok(copied_bytes) => copied_bytes,
+        Err(error) => {
+            let _ = tokio::fs::remove_file(&temporary_file).await;
+
+            return Err(format!(
+                "Impossible d'exporter {} : {error}",
+                source_file.display()
+            ));
+        }
+    };
+
+    if destination_file.exists() {
+        tokio::fs::remove_file(&destination_file)
+            .await
+            .map_err(|error| {
+                format!(
+                    "Impossible de remplacer {} : {error}",
+                    destination_file.display()
+                )
+            })?;
+    }
+
+    tokio::fs::rename(&temporary_file, &destination_file)
+        .await
+        .map_err(|error| {
+            format!(
+                "Impossible de finaliser l'export vers {} : \
+             {error}",
+                destination_file.display()
+            )
+        })?;
+
+    Ok(copied_bytes)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -508,6 +668,8 @@ pub fn run() {
             get_pipeline_backend_status,
             stop_pipeline_backend,
             upload_pipeline_file,
+            open_pipeline_file,
+            export_pipeline_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
