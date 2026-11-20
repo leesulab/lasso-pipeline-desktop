@@ -20,9 +20,11 @@ import {
 } from "lucide-react";
 import {
   createPipelineJob,
-  fetchPipelineJob,
   runPipelineJob,
 } from "./api";
+import {
+  monitorPipelineJob,
+} from "./monitorPipelineJob";
 import { usePipelineData } from "./usePipelineData";
 import {
   uploadSelectedPipelineFiles,
@@ -327,38 +329,18 @@ function App() {
         createdJob.jobId,
       );
 
-      const pollingDeadline = Date.now() + 60_000;
-
-      while (Date.now() < pollingDeadline) {
-        await new Promise((resolve) => {
-          window.setTimeout(resolve, 500);
-        });
-
-        const job = await fetchPipelineJob(
-          backendStatus,
-          createdJob.jobId,
-        );
-
-        await refreshPipelineData();
-
-        if (
-          job.status === "success" ||
-          job.status === "error"
-        ) {
-          if (job.status === "error") {
-            throw new Error(
-              job.error?.message ??
-                "La pipeline s'est terminée en erreur.",
-            );
-          }
-
-          return;
-        }
-      }
-
-      throw new Error(
-        "Le suivi du job a dépassé 60 secondes.",
+      await monitorPipelineJob(
+        backendStatus,
+        createdJob.jobId,
+        {
+          pollingIntervalMs: 1_000,
+          onUpdate: async () => {
+            await refreshPipelineData();
+          },
+        },
       );
+
+      await refreshPipelineData();
     } catch (error) {
       setJobActionError(String(error));
       await refreshPipelineData();
