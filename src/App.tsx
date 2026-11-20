@@ -9,7 +9,6 @@ import {
 import { motion } from "framer-motion";
 import {
   Activity,
-  CheckCircle2,
   Clock3,
   Database,
   FolderOpen,
@@ -26,6 +25,11 @@ import {
   monitorPipelineJob,
 } from "./monitorPipelineJob";
 import { usePipelineData } from "./usePipelineData";
+import {
+  formatFileSize,
+  getPipelineFileName,
+  usePipelineFiles,
+} from "./usePipelineFiles";
 import {
   uploadSelectedPipelineFiles,
   type UploadProgress,
@@ -144,6 +148,25 @@ function App() {
   const [jobActionError, setJobActionError] =
     useState<string | null>(null);
   const [view, setView] = useState<View>("overview");
+  const [selectedResultJobId, setSelectedResultJobId] =
+    useState<string | null>(null);
+
+  const selectedResultJob =
+    jobs.find(
+      (job) =>
+        job.source.jobId === selectedResultJobId,
+    ) ?? null;
+
+  const {
+    files: selectedJobFiles,
+    filesByCategory,
+    loading: resultFilesLoading,
+    error: resultFilesError,
+    refresh: refreshResultFiles,
+  } = usePipelineFiles(
+    backendStatus,
+    selectedResultJobId,
+  );
 
   const runningJobs = useMemo(
     () => jobs.filter((job) => job.status === "running").length,
@@ -285,6 +308,11 @@ function App() {
     } catch (error) {
       setFileSelectionError(String(error));
     }
+  }
+
+  function showJobResults(jobId: string) {
+    setSelectedResultJobId(jobId);
+    setView("results");
   }
 
   async function restartJob(jobId: string) {
@@ -862,6 +890,20 @@ function App() {
                       <div className="job-card-actions">
                         <StatusBadge status={job.status} />
 
+                        <button
+                          type="button"
+                          className="view-results-button"
+                          disabled={!engineStarted}
+                          onClick={() =>
+                            showJobResults(
+                              job.source.jobId,
+                            )
+                          }
+                        >
+                          <Database size={14} />
+                          Voir les fichiers
+                        </button>
+
                         {(job.status === "error" ||
                           job.status === "interrupted") && (
                           <button
@@ -906,28 +948,131 @@ function App() {
                   <div>
                     <h2>Résultats</h2>
                     <p>
-                      Fichiers produits par les analyses
-                      terminées.
+                      {selectedResultJob
+                        ? `Fichiers du job ${selectedResultJob.name}`
+                        : "Sélectionnez une analyse pour consulter ses fichiers."}
                     </p>
                   </div>
+
+                  {selectedResultJobId && (
+                    <button
+                      className="button button-secondary"
+                      disabled={resultFilesLoading}
+                      onClick={() =>
+                        void refreshResultFiles()
+                      }
+                    >
+                      <RefreshCw
+                        size={17}
+                        className={
+                          resultFilesLoading
+                            ? "icon-spinning"
+                            : ""
+                        }
+                      />
+                      Actualiser
+                    </button>
+                  )}
                 </div>
 
-                <article className="card result-card">
-                  <CheckCircle2 size={28} />
+                {!selectedResultJobId && (
+                  <article className="card empty-state">
+                    Ouvrez « Analyses récentes », puis cliquez
+                    sur « Voir les fichiers ».
+                  </article>
+                )}
 
-                  <div>
+                {resultFilesError && (
+                  <div className="backend-error-panel">
                     <strong>
-                      Observatoire HRMS · Bougival
+                      Impossible de charger les fichiers
                     </strong>
-                    <span>
-                      features_complete.parquet ·
-                      feature_matrix.parquet · 7 visualisations
-                      · pipeline.log
-                    </span>
+                    <span>{resultFilesError}</span>
                   </div>
-                </article>
+                )}
+
+                {selectedResultJobId &&
+                  !resultFilesLoading &&
+                  !resultFilesError &&
+                  selectedJobFiles.length === 0 && (
+                    <article className="card empty-state">
+                      Ce job ne contient encore aucun fichier.
+                    </article>
+                  )}
+
+                {selectedResultJobId &&
+                  selectedJobFiles.length > 0 && (
+                    <div className="result-groups">
+                      {[
+                        {
+                          key: "output" as const,
+                          title: "Fichiers de sortie",
+                        },
+                        {
+                          key: "log" as const,
+                          title: "Journaux",
+                        },
+                        {
+                          key: "intermediate" as const,
+                          title: "Résultats intermédiaires",
+                        },
+                        {
+                          key: "input" as const,
+                          title: "Fichiers d’entrée",
+                        },
+                      ].map((group) => {
+                        const groupFiles =
+                          filesByCategory[group.key];
+
+                        if (groupFiles.length === 0) {
+                          return null;
+                        }
+
+                        return (
+                          <article
+                            className="card result-group"
+                            key={group.key}
+                          >
+                            <div className="card-title">
+                              <h3>{group.title}</h3>
+                              <span>
+                                {groupFiles.length} fichier(s)
+                              </span>
+                            </div>
+
+                            {groupFiles.map((file) => (
+                              <div
+                                className="result-file-row"
+                                key={file.relativePath}
+                              >
+                                <Database size={18} />
+
+                                <div>
+                                  <strong>
+                                    {getPipelineFileName(
+                                      file.relativePath,
+                                    )}
+                                  </strong>
+                                  <span>
+                                    {file.relativePath}
+                                  </span>
+                                </div>
+
+                                <small>
+                                  {formatFileSize(
+                                    file.sizeBytes,
+                                  )}
+                                </small>
+                              </div>
+                            ))}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
               </>
             )}
+
           </motion.div>
         </section>
       </div>

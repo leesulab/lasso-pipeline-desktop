@@ -709,3 +709,80 @@ button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
+
+.view-results-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 6px 9px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.view-results-button:hover:not(:disabled) {
+  border-color: #5eead4;
+  background: #f0fdfa;
+  color: #115e59;
+}
+
+.result-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.result-group {
+  overflow: hidden;
+}
+
+.result-group .card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.result-group .card-title span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.result-file-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.result-file-row:last-child {
+  border-bottom: 0;
+}
+
+.result-file-row > svg {
+  color: #0f766e;
+}
+
+.result-file-row strong,
+.result-file-row span {
+  display: block;
+}
+
+.result-file-row span {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-file-row small {
+  color: #475569;
+  font-size: 12px;
+  white-space: nowrap;
+}
