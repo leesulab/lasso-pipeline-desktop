@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "lasso-pipeline-desktop",
-        "width": 800,
-        "height": 600
+        "title": "LASSO Pipeline Desktop",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 760,
+        "minHeight": 560
       }
     ],
     "security": {
