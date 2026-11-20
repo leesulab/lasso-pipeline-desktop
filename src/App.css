@@ -656,3 +656,21 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+.upload-progress {
+  margin-top: 14px;
+  border: 1px solid #ccfbf1;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f0fdfa;
+}
+
+.upload-progress small {
+  display: block;
+  margin-top: 7px;
+  overflow: hidden;
+  color: #475569;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

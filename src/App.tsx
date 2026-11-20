@@ -25,6 +25,10 @@ import {
 } from "./api";
 import { usePipelineData } from "./usePipelineData";
 import {
+  uploadSelectedPipelineFiles,
+  type UploadProgress,
+} from "./uploadSelectedFiles";
+import {
   emptySelectedFiles,
   getFileName,
   selectBlankFiles,
@@ -126,6 +130,8 @@ function App() {
     useState<string | null>(null);
   const [jobActionPending, setJobActionPending] =
     useState(false);
+  const [uploadProgress, setUploadProgress] =
+    useState<UploadProgress | null>(null);
   const [jobActionError, setJobActionError] =
     useState<string | null>(null);
   const [view, setView] = useState<View>("overview");
@@ -294,6 +300,12 @@ function App() {
       await refreshPipelineData();
       setView("jobs");
 
+      await uploadSelectedPipelineFiles(
+        createdJob.jobId,
+        selectedFiles,
+        setUploadProgress,
+      );
+
       await runPipelineJob(
         backendStatus,
         createdJob.jobId,
@@ -335,6 +347,7 @@ function App() {
       setJobActionError(String(error));
       await refreshPipelineData();
     } finally {
+      setUploadProgress(null);
       setJobActionPending(false);
     }
   }
@@ -705,6 +718,40 @@ function App() {
                       {fileSelectionError}
                     </div>
                   )}
+
+                  {uploadProgress &&
+                    uploadProgress.total > 0 && (
+                      <div className="upload-progress">
+                        <div className="progress-label">
+                          <span>
+                            Transfert des fichiers
+                          </span>
+                          <span>
+                            {uploadProgress.completed}/
+                            {uploadProgress.total}
+                          </span>
+                        </div>
+
+                        <ProgressBar
+                          value={
+                            uploadProgress.total > 0
+                              ? (
+                                  uploadProgress.completed /
+                                  uploadProgress.total
+                                ) * 100
+                              : 0
+                          }
+                        />
+
+                        {uploadProgress.currentFile && (
+                          <small>
+                            {getFileName(
+                              uploadProgress.currentFile,
+                            )}
+                          </small>
+                        )}
+                      </div>
+                    )}
 
                   <div className="pipeline-actions">
                     <button
