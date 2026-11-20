@@ -674,3 +674,8 @@ button:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.status-interrupted {
+  background: #fef3c7;
+  color: #92400e;
+}

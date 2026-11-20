@@ -30,7 +30,12 @@ export type PipelineStep = {
 export type DisplayJob = {
   id: string;
   name: string;
-  status: "success" | "running" | "error" | "created";
+  status:
+    | "success"
+    | "running"
+    | "error"
+    | "created"
+    | "interrupted";
   progress: number;
   step: string;
   updated: string;
@@ -66,7 +71,8 @@ function mapJob(job: PipelineJob): DisplayJob {
     currentStep ??
     (job.status === "success"
       ? "Terminé"
-      : job.status === "error"
+      : job.status === "error" ||
+          job.status === "interrupted"
         ? job.error?.message ?? job.message
         : job.message);
 

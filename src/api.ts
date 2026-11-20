@@ -4,7 +4,8 @@ export type PipelineJobStatus =
   | "created"
   | "running"
   | "success"
-  | "error";
+  | "error"
+  | "interrupted";
 
 export type PipelineJob = {
   jobId: string;

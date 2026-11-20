@@ -48,7 +48,8 @@ type JobStatus =
   | "created"
   | "success"
   | "running"
-  | "error";
+  | "error"
+  | "interrupted";
 type View = "overview" | "new" | "jobs" | "results";
 
 const navigation = [
@@ -80,6 +81,7 @@ function StatusBadge({ status }: { status: JobStatus }) {
     success: "Terminé",
     running: "En cours",
     error: "Erreur",
+    interrupted: "Interrompu",
   };
 
   return (
