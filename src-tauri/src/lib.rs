@@ -14,8 +14,10 @@ use tauri::Manager;
 struct ConnectionInfo {
     host: String,
     port: u16,
+    #[serde(alias = "base_url")]
     base_url: String,
     token: String,
+    #[serde(alias = "health_url")]
     health_url: String,
 }
 
@@ -53,7 +55,9 @@ struct PipelineBackendState {
 }
 
 fn find_pipeline_directory() -> Result<PathBuf, String> {
-    if let Ok(configured_directory) = env::var("PIPELINE_BACKEND_DIR") {
+    if let Ok(configured_directory) = env::var(
+        "PIPELINE_BACKEND_DIR",
+    ) {
         let directory = PathBuf::from(configured_directory)
             .canonicalize()
             .map_err(|error| {
@@ -66,24 +70,33 @@ fn find_pipeline_directory() -> Result<PathBuf, String> {
     }
 
     let current_directory = env::current_dir().map_err(|error| {
-        format!("Impossible de déterminer le dossier courant : {error}")
+        format!(
+            "Impossible de déterminer le dossier courant : {error}"
+        )
     })?;
 
-    let candidate = current_directory
-        .parent()
-        .ok_or_else(|| {
-            "Le dossier parent du projet Tauri est introuvable."
-                .to_string()
-        })?
-        .join("pipeline_identification_ms");
+    for ancestor in current_directory.ancestors() {
+        let candidate = ancestor.join(
+            "pipeline_identification_ms",
+        );
 
-    candidate.canonicalize().map_err(|error| {
-        format!(
-            "Moteur Python introuvable dans {} : {error}. \
-             Définissez PIPELINE_BACKEND_DIR si nécessaire.",
-            candidate.display()
-        )
-    })
+        let main_file = candidate.join("main.py");
+        let api_file = candidate.join("api").join("sidecar.py");
+
+        if main_file.is_file() && api_file.is_file() {
+            return candidate.canonicalize().map_err(|error| {
+                format!(
+                    "Impossible de résoudre {} : {error}",
+                    candidate.display()
+                )
+            });
+        }
+    }
+
+    Err(format!(
+        "Moteur Python introuvable depuis {}.          Définissez PIPELINE_BACKEND_DIR si nécessaire.",
+        current_directory.display()
+    ))
 }
 
 fn find_python_executable(

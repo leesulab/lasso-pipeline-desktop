@@ -1,4 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getBackendStatus,
+  startBackend,
+  stopBackend,
+  stoppedBackendStatus,
+  type BackendStatus,
+} from "./backend";
 import { motion } from "framer-motion";
 import {
   Activity,
@@ -129,7 +136,11 @@ function ProgressBar({
 }
 
 function App() {
-  const [engineStarted, setEngineStarted] = useState(true);
+  const [backendStatus, setBackendStatus] =
+    useState<BackendStatus>(stoppedBackendStatus);
+  const [backendLoading, setBackendLoading] = useState(true);
+  const [backendActionPending, setBackendActionPending] =
+    useState(false);
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [selectedSteps, setSelectedSteps] = useState<string[]>(
     pipelineSteps.map((step) => step.id),
@@ -140,6 +151,63 @@ function App() {
     () => jobs.filter((job) => job.status === "running").length,
     [jobs],
   );
+
+  const engineStarted = backendStatus.running;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBackendStatus() {
+      try {
+        const status = await getBackendStatus();
+
+        if (!cancelled) {
+          setBackendStatus(status);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBackendStatus({
+            ...stoppedBackendStatus,
+            error: String(error),
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setBackendLoading(false);
+        }
+      }
+    }
+
+    void loadBackendStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function toggleBackend() {
+    if (backendActionPending) {
+      return;
+    }
+
+    setBackendActionPending(true);
+
+    try {
+      const status = backendStatus.running
+        ? await stopBackend()
+        : await startBackend();
+
+      setBackendStatus(status);
+    } catch (error) {
+      setBackendStatus((current) => ({
+        ...current,
+        error: String(error),
+      }));
+    } finally {
+      setBackendActionPending(false);
+      setBackendLoading(false);
+    }
+  }
 
   function toggleStep(stepId: string) {
     setSelectedSteps((current) =>
@@ -194,23 +262,37 @@ function App() {
               }`}
             >
               <span className="engine-dot" />
-              {engineStarted
-                ? "Moteur local actif"
-                : "Moteur arrêté"}
+              {backendLoading
+                ? "Vérification du moteur…"
+                : engineStarted
+                  ? "Moteur local actif"
+                  : "Moteur arrêté"}
             </div>
 
             <button
               className="button button-secondary"
-              onClick={() =>
-                setEngineStarted((value) => !value)
+              onClick={() => void toggleBackend()}
+              disabled={
+                backendLoading || backendActionPending
               }
             >
               <Server size={17} />
-              {engineStarted ? "Arrêter" : "Démarrer"}
+              {backendActionPending
+                ? "Veuillez patienter…"
+                : engineStarted
+                  ? "Arrêter"
+                  : "Démarrer"}
             </button>
           </div>
         </div>
       </header>
+
+      {backendStatus.error && (
+        <div className="backend-error-panel">
+          <strong>Échec du démarrage du moteur</strong>
+          <span>{backendStatus.error}</span>
+        </div>
+      )}
 
       <div className="application-layout">
         <aside className="sidebar">

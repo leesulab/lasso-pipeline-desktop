@@ -494,3 +494,21 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+.backend-error-panel {
+  width: min(1232px, calc(100% - 48px));
+  margin: 16px auto 0;
+  padding: 13px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 13px;
+}
+
+.backend-error-panel strong {
+  font-size: 14px;
+}
