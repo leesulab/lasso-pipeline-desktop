@@ -786,3 +786,62 @@ button:disabled {
   font-size: 12px;
   white-space: nowrap;
 }
+
+.result-file-row {
+  grid-template-columns:
+    24px minmax(0, 1fr) auto minmax(190px, auto);
+}
+
+.result-file-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.result-file-actions button {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.result-file-actions button:hover:not(:disabled) {
+  border-color: #5eead4;
+  background: #f0fdfa;
+  color: #115e59;
+}
+
+.result-file-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.result-action-success {
+  margin-bottom: 16px;
+  border: 1px solid #a7f3d0;
+  border-radius: 12px;
+  padding: 11px 14px;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+@media (max-width: 1000px) {
+  .result-file-row {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .result-file-row > small,
+  .result-file-actions {
+    grid-column: 2;
+  }
+
+  .result-file-actions {
+    justify-content: flex-start;
+  }
+}

@@ -31,7 +31,7 @@ export async function exportResultFile(
   jobId: string,
   relativePath: string,
   filename: string,
-): Promise<boolean> {
+): Promise<number | null> {
   const extension = getExtension(filename);
 
   const destinationPath = await save({
@@ -48,14 +48,12 @@ export async function exportResultFile(
   });
 
   if (!destinationPath) {
-    return false;
+    return null;
   }
 
-  await exportPipelineFile(
+  return exportPipelineFile(
     jobId,
     relativePath,
     destinationPath,
   );
-
-  return true;
 }

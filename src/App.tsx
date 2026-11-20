@@ -31,6 +31,10 @@ import {
   usePipelineFiles,
 } from "./usePipelineFiles";
 import {
+  exportResultFile,
+  openResultFile,
+} from "./resultFileActions";
+import {
   uploadSelectedPipelineFiles,
   type UploadProgress,
 } from "./uploadSelectedFiles";
@@ -149,6 +153,12 @@ function App() {
     useState<string | null>(null);
   const [view, setView] = useState<View>("overview");
   const [selectedResultJobId, setSelectedResultJobId] =
+    useState<string | null>(null);
+  const [resultActionPending, setResultActionPending] =
+    useState<string | null>(null);
+  const [resultActionMessage, setResultActionMessage] =
+    useState<string | null>(null);
+  const [resultActionError, setResultActionError] =
     useState<string | null>(null);
 
   const selectedResultJob =
@@ -307,6 +317,71 @@ function App() {
       }
     } catch (error) {
       setFileSelectionError(String(error));
+    }
+  }
+
+  async function handleOpenResultFile(
+    relativePath: string,
+  ) {
+    if (!selectedResultJobId || resultActionPending) {
+      return;
+    }
+
+    const actionKey = `open:${relativePath}`;
+
+    setResultActionPending(actionKey);
+    setResultActionMessage(null);
+    setResultActionError(null);
+
+    try {
+      await openResultFile(
+        selectedResultJobId,
+        relativePath,
+      );
+
+      setResultActionMessage(
+        `Fichier ouvert : ${getPipelineFileName(
+          relativePath,
+        )}`,
+      );
+    } catch (error) {
+      setResultActionError(String(error));
+    } finally {
+      setResultActionPending(null);
+    }
+  }
+
+  async function handleExportResultFile(
+    relativePath: string,
+  ) {
+    if (!selectedResultJobId || resultActionPending) {
+      return;
+    }
+
+    const filename = getPipelineFileName(relativePath);
+    const actionKey = `export:${relativePath}`;
+
+    setResultActionPending(actionKey);
+    setResultActionMessage(null);
+    setResultActionError(null);
+
+    try {
+      const exportedBytes = await exportResultFile(
+        selectedResultJobId,
+        relativePath,
+        filename,
+      );
+
+      if (exportedBytes !== null) {
+        setResultActionMessage(
+          `${filename} exporté avec succès ` +
+            `(${formatFileSize(exportedBytes)}).`,
+        );
+      }
+    } catch (error) {
+      setResultActionError(String(error));
+    } finally {
+      setResultActionPending(null);
     }
   }
 
@@ -991,6 +1066,21 @@ function App() {
                   </div>
                 )}
 
+                {resultActionError && (
+                  <div className="backend-error-panel">
+                    <strong>
+                      Action impossible sur le fichier
+                    </strong>
+                    <span>{resultActionError}</span>
+                  </div>
+                )}
+
+                {resultActionMessage && (
+                  <div className="result-action-success">
+                    {resultActionMessage}
+                  </div>
+                )}
+
                 {selectedResultJobId &&
                   !resultFilesLoading &&
                   !resultFilesError &&
@@ -1063,6 +1153,42 @@ function App() {
                                     file.sizeBytes,
                                   )}
                                 </small>
+
+                                <div className="result-file-actions">
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      resultActionPending !== null
+                                    }
+                                    onClick={() =>
+                                      void handleOpenResultFile(
+                                        file.relativePath,
+                                      )
+                                    }
+                                  >
+                                    {resultActionPending ===
+                                    `open:${file.relativePath}`
+                                      ? "Ouverture…"
+                                      : "Ouvrir"}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      resultActionPending !== null
+                                    }
+                                    onClick={() =>
+                                      void handleExportResultFile(
+                                        file.relativePath,
+                                      )
+                                    }
+                                  >
+                                    {resultActionPending ===
+                                    `export:${file.relativePath}`
+                                      ? "Export…"
+                                      : "Exporter sous…"}
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </article>
