@@ -29,6 +29,9 @@ import {
   type UploadProgress,
 } from "./uploadSelectedFiles";
 import {
+  validatePipelineSelection,
+} from "./validatePipelineSelection";
+import {
   emptySelectedFiles,
   getFileName,
   selectBlankFiles,
@@ -284,6 +287,19 @@ function App() {
       selectedSteps.length === 0 ||
       jobActionPending
     ) {
+      return;
+    }
+
+    const validationErrors =
+      validatePipelineSelection(
+        selectedSteps,
+        selectedFiles,
+      );
+
+    if (validationErrors.length > 0) {
+      setJobActionError(
+        validationErrors.join(" "),
+      );
       return;
     }
 
