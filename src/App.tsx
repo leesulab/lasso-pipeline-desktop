@@ -137,6 +137,8 @@ function App() {
     useState<string | null>(null);
   const [jobActionPending, setJobActionPending] =
     useState(false);
+  const [restartingJobId, setRestartingJobId] =
+    useState<string | null>(null);
   const [uploadProgress, setUploadProgress] =
     useState<UploadProgress | null>(null);
   const [jobActionError, setJobActionError] =
@@ -282,6 +284,45 @@ function App() {
       }
     } catch (error) {
       setFileSelectionError(String(error));
+    }
+  }
+
+  async function restartJob(jobId: string) {
+    if (
+      !backendStatus.running ||
+      restartingJobId !== null
+    ) {
+      return;
+    }
+
+    setRestartingJobId(jobId);
+    setJobActionError(null);
+
+    try {
+      await runPipelineJob(
+        backendStatus,
+        jobId,
+      );
+
+      await refreshPipelineData();
+
+      await monitorPipelineJob(
+        backendStatus,
+        jobId,
+        {
+          pollingIntervalMs: 1_000,
+          onUpdate: async () => {
+            await refreshPipelineData();
+          },
+        },
+      );
+
+      await refreshPipelineData();
+    } catch (error) {
+      setJobActionError(String(error));
+      await refreshPipelineData();
+    } finally {
+      setRestartingJobId(null);
     }
   }
 
@@ -818,7 +859,41 @@ function App() {
                         />
                       </div>
 
-                      <StatusBadge status={job.status} />
+                      <div className="job-card-actions">
+                        <StatusBadge status={job.status} />
+
+                        {(job.status === "error" ||
+                          job.status === "interrupted") && (
+                          <button
+                            type="button"
+                            className="restart-job-button"
+                            disabled={
+                              !engineStarted ||
+                              restartingJobId !== null
+                            }
+                            onClick={() =>
+                              void restartJob(
+                                job.source.jobId,
+                              )
+                            }
+                          >
+                            <RefreshCw
+                              size={14}
+                              className={
+                                restartingJobId ===
+                                job.source.jobId
+                                  ? "icon-spinning"
+                                  : ""
+                              }
+                            />
+
+                            {restartingJobId ===
+                            job.source.jobId
+                              ? "Relance…"
+                              : "Relancer"}
+                          </button>
+                        )}
+                      </div>
                     </article>
                   ))}
                 </div>
