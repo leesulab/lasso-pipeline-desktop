@@ -24,6 +24,15 @@ import {
   runPipelineJob,
 } from "./api";
 import { usePipelineData } from "./usePipelineData";
+import {
+  emptySelectedFiles,
+  getFileName,
+  selectBlankFiles,
+  selectCalibrationFile,
+  selectDatabaseFile,
+  selectSampleFiles,
+  type SelectedPipelineFiles,
+} from "./fileSelection";
 import "./App.css";
 
 type JobStatus =
@@ -109,6 +118,12 @@ function App() {
   const [projectName, setProjectName] = useState(
     "Nouvelle analyse locale",
   );
+  const [selectedFiles, setSelectedFiles] =
+    useState<SelectedPipelineFiles>(
+      emptySelectedFiles,
+    );
+  const [fileSelectionError, setFileSelectionError] =
+    useState<string | null>(null);
   const [jobActionPending, setJobActionPending] =
     useState(false);
   const [jobActionError, setJobActionError] =
@@ -185,6 +200,75 @@ function App() {
     } finally {
       setBackendActionPending(false);
       setBackendLoading(false);
+    }
+  }
+
+  async function chooseCalibrationFile() {
+    setFileSelectionError(null);
+
+    try {
+      const calibration =
+        await selectCalibrationFile();
+
+      if (calibration) {
+        setSelectedFiles((current) => ({
+          ...current,
+          calibration,
+        }));
+      }
+    } catch (error) {
+      setFileSelectionError(String(error));
+    }
+  }
+
+  async function chooseDatabaseFile() {
+    setFileSelectionError(null);
+
+    try {
+      const database = await selectDatabaseFile();
+
+      if (database) {
+        setSelectedFiles((current) => ({
+          ...current,
+          database,
+        }));
+      }
+    } catch (error) {
+      setFileSelectionError(String(error));
+    }
+  }
+
+  async function chooseBlankFiles() {
+    setFileSelectionError(null);
+
+    try {
+      const blanks = await selectBlankFiles();
+
+      if (blanks.length > 0) {
+        setSelectedFiles((current) => ({
+          ...current,
+          blanks,
+        }));
+      }
+    } catch (error) {
+      setFileSelectionError(String(error));
+    }
+  }
+
+  async function chooseSampleFiles() {
+    setFileSelectionError(null);
+
+    try {
+      const samples = await selectSampleFiles();
+
+      if (samples.length > 0) {
+        setSelectedFiles((current) => ({
+          ...current,
+          samples,
+        }));
+      }
+    } catch (error) {
+      setFileSelectionError(String(error));
     }
   }
 
@@ -532,12 +616,97 @@ function App() {
                     ))}
                   </div>
 
-                  <div className="pipeline-actions">
-                    <button className="button button-secondary">
+                  <div className="file-selection-grid">
+                    <button
+                      type="button"
+                      className="file-selection-button"
+                      onClick={() =>
+                        void chooseCalibrationFile()
+                      }
+                    >
                       <FolderOpen size={17} />
-                      Sélectionner les fichiers
+
+                      <span>
+                        <strong>Calibration CCS</strong>
+                        <small>
+                          {selectedFiles.calibration
+                            ? getFileName(
+                                selectedFiles.calibration,
+                              )
+                            : "Aucun fichier CSV"}
+                        </small>
+                      </span>
                     </button>
 
+                    <button
+                      type="button"
+                      className="file-selection-button"
+                      onClick={() =>
+                        void chooseDatabaseFile()
+                      }
+                    >
+                      <Database size={17} />
+
+                      <span>
+                        <strong>
+                          Base d’identification
+                        </strong>
+                        <small>
+                          {selectedFiles.database
+                            ? getFileName(
+                                selectedFiles.database,
+                              )
+                            : "Aucun fichier H5/HDF5"}
+                        </small>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="file-selection-button"
+                      onClick={() =>
+                        void chooseBlankFiles()
+                      }
+                    >
+                      <FolderOpen size={17} />
+
+                      <span>
+                        <strong>Blanks</strong>
+                        <small>
+                          {selectedFiles.blanks.length > 0
+                            ? `${selectedFiles.blanks.length} fichier(s)`
+                            : "Aucun fichier Parquet"}
+                        </small>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="file-selection-button"
+                      onClick={() =>
+                        void chooseSampleFiles()
+                      }
+                    >
+                      <UploadCloud size={17} />
+
+                      <span>
+                        <strong>Échantillons</strong>
+                        <small>
+                          {selectedFiles.samples.length > 0
+                            ? `${selectedFiles.samples.length} fichier(s)`
+                            : "Aucun fichier Parquet"}
+                        </small>
+                      </span>
+                    </button>
+                  </div>
+
+                  {fileSelectionError && (
+                    <div className="selection-error">
+                      {fileSelectionError}
+                    </div>
+                  )}
+
+                  <div className="pipeline-actions">
                     <button
                       className="button button-primary"
                       disabled={

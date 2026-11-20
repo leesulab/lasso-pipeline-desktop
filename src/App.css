@@ -591,3 +591,68 @@ button:disabled {
   border-color: #0f766e;
   box-shadow: 0 0 0 3px rgb(15 118 110 / 12%);
 }
+
+.file-selection-grid {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.file-selection-button {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  padding: 13px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: #f8fafc;
+  color: #334155;
+  text-align: left;
+}
+
+.file-selection-button:hover {
+  border-color: #5eead4;
+  background: #f0fdfa;
+}
+
+.file-selection-button > svg {
+  flex: 0 0 auto;
+  color: #0f766e;
+}
+
+.file-selection-button span,
+.file-selection-button strong,
+.file-selection-button small {
+  min-width: 0;
+  display: block;
+}
+
+.file-selection-button strong {
+  font-size: 13px;
+}
+
+.file-selection-button small {
+  margin-top: 4px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-error {
+  margin-top: 12px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .file-selection-grid {
+    grid-template-columns: 1fr;
+  }
+}
