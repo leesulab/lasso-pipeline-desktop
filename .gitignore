@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Sidecars Python produits localement ou par la CI
+src-tauri/binaries/pipeline-api-sidecar-*
