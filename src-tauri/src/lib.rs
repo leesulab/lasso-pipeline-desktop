@@ -5,12 +5,19 @@ use std::{
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     str::FromStr,
-    sync::Mutex,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     thread,
     time::Duration,
 };
 use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_shell::{
+    ShellExt,
+    process::{CommandChild, CommandEvent},
+};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,8 +44,68 @@ struct BackendStatus {
     error: Option<String>,
 }
 
+enum BackendChild {
+    Python(Child),
+    Packaged {
+        child: Option<CommandChild>,
+        running: Arc<AtomicBool>,
+        termination: Arc<Mutex<Option<String>>>,
+    },
+}
+
+impl BackendChild {
+    fn pid(&self) -> u32 {
+        match self {
+            Self::Python(child) => child.id(),
+            Self::Packaged { child, .. } => child.as_ref().map(CommandChild::pid).unwrap_or(0),
+        }
+    }
+
+    fn is_running(&mut self) -> Result<bool, String> {
+        match self {
+            Self::Python(child) => child
+                .try_wait()
+                .map(|status| status.is_none())
+                .map_err(|error| format!("Impossible de vérifier le backend Python : {error}")),
+            Self::Packaged { running, .. } => Ok(running.load(Ordering::SeqCst)),
+        }
+    }
+
+    fn termination_message(&self) -> Option<String> {
+        match self {
+            Self::Python(_) => None,
+            Self::Packaged { termination, .. } => {
+                termination.lock().ok().and_then(|value| value.clone())
+            }
+        }
+    }
+
+    fn kill(&mut self) -> Result<(), String> {
+        match self {
+            Self::Python(child) => {
+                child
+                    .kill()
+                    .map_err(|error| format!("Impossible d'arrêter le backend Python : {error}"))?;
+
+                let _ = child.wait();
+                Ok(())
+            }
+            Self::Packaged { child, running, .. } => {
+                if let Some(child) = child.take() {
+                    child
+                        .kill()
+                        .map_err(|error| format!("Impossible d'arrêter le sidecar : {error}"))?;
+                }
+
+                running.store(false, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+    }
+}
+
 struct BackendProcess {
-    child: Child,
+    child: BackendChild,
     connection: ConnectionInfo,
     connection_file: PathBuf,
     jobs_dir: PathBuf,
@@ -47,7 +114,6 @@ struct BackendProcess {
 impl Drop for BackendProcess {
     fn drop(&mut self) {
         let _ = self.child.kill();
-        let _ = self.child.wait();
         let _ = fs::remove_file(&self.connection_file);
     }
 }
@@ -110,17 +176,13 @@ fn find_python_executable(pipeline_directory: &Path) -> Result<PathBuf, String> 
 
 fn wait_for_connection_file(
     connection_file: &Path,
-    child: &mut Child,
+    child: &mut BackendChild,
 ) -> Result<ConnectionInfo, String> {
-    for _ in 0..100 {
-        if let Some(exit_status) = child
-            .try_wait()
-            .map_err(|error| format!("Impossible de vérifier le processus Python : {error}"))?
-        {
-            return Err(format!(
-                "Le backend Python s'est arrêté prématurément : \
-                 {exit_status}"
-            ));
+    for _ in 0..600 {
+        if !child.is_running()? {
+            return Err(child.termination_message().unwrap_or_else(|| {
+                "Le backend s'est arrêté avant de produire son fichier de connexion.".to_string()
+            }));
         }
 
         if connection_file.is_file() {
@@ -135,27 +197,23 @@ fn wait_for_connection_file(
         thread::sleep(Duration::from_millis(100));
     }
 
-    Err(
-        "Le backend Python n'a pas produit son fichier de connexion \
-         sous 10 secondes."
-            .to_string(),
-    )
+    Err("Le backend n'a pas produit son fichier de connexion sous 60 secondes.".to_string())
 }
 
-fn wait_for_backend_ready(connection: &ConnectionInfo, child: &mut Child) -> Result<(), String> {
+fn wait_for_backend_ready(
+    connection: &ConnectionInfo,
+    child: &mut BackendChild,
+) -> Result<(), String> {
     let ip_address = IpAddr::from_str(&connection.host)
         .map_err(|error| format!("Adresse du backend invalide {} : {error}", connection.host))?;
 
     let socket_address = SocketAddr::new(ip_address, connection.port);
 
-    for _ in 0..100 {
-        if let Some(exit_status) = child
-            .try_wait()
-            .map_err(|error| format!("Impossible de vérifier le backend : {error}"))?
-        {
-            return Err(format!(
-                "Le backend Python s'est arrêté prématurément :                  {exit_status}"
-            ));
+    for _ in 0..600 {
+        if !child.is_running()? {
+            return Err(child
+                .termination_message()
+                .unwrap_or_else(|| "Le backend s'est arrêté avant d'être prêt.".to_string()));
         }
 
         if TcpStream::connect_timeout(&socket_address, Duration::from_millis(100)).is_ok() {
@@ -166,15 +224,143 @@ fn wait_for_backend_ready(connection: &ConnectionInfo, child: &mut Child) -> Res
     }
 
     Err(format!(
-        "Le backend n'écoute pas sur {} après 10 secondes.",
+        "Le backend n'écoute pas sur {} après 60 secondes.",
         socket_address
     ))
+}
+
+fn spawn_packaged_backend(
+    app: &tauri::AppHandle,
+    connection_file: &Path,
+    jobs_directory: &Path,
+) -> Result<BackendChild, String> {
+    let command = app
+        .shell()
+        .sidecar("pipeline-api-sidecar")
+        .map_err(|error| format!("Sidecar empaqueté indisponible : {error}"))?
+        .args([
+            "--connection-file",
+            &connection_file.display().to_string(),
+            "--jobs-dir",
+            &jobs_directory.display().to_string(),
+        ])
+        .set_process_group(true)
+        .kill_on_drop(true);
+
+    let (mut events, child) = command
+        .spawn()
+        .map_err(|error| format!("Impossible de démarrer le sidecar empaqueté : {error}"))?;
+
+    let running = Arc::new(AtomicBool::new(true));
+    let termination = Arc::new(Mutex::new(None::<String>));
+
+    let event_running = Arc::clone(&running);
+    let event_termination = Arc::clone(&termination);
+
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = events.recv().await {
+            match event {
+                CommandEvent::Stdout(output) => {
+                    let text = String::from_utf8_lossy(&output);
+
+                    if !text.trim().is_empty() {
+                        println!("[pipeline-api] {}", text.trim());
+                    }
+                }
+                CommandEvent::Stderr(output) => {
+                    let text = String::from_utf8_lossy(&output);
+
+                    if !text.trim().is_empty() {
+                        eprintln!("[pipeline-api] {}", text.trim());
+                    }
+                }
+                CommandEvent::Error(error) => {
+                    if let Ok(mut message) = event_termination.lock() {
+                        *message = Some(format!("Erreur du sidecar : {error}"));
+                    }
+
+                    event_running.store(false, Ordering::SeqCst);
+                }
+                CommandEvent::Terminated(payload) => {
+                    let message = format!(
+                        "Le sidecar s'est arrêté avec le code {:?} et le signal {:?}.",
+                        payload.code, payload.signal,
+                    );
+
+                    if let Ok(mut stored_message) = event_termination.lock() {
+                        *stored_message = Some(message);
+                    }
+
+                    event_running.store(false, Ordering::SeqCst);
+                }
+                _ => {}
+            }
+        }
+
+        event_running.store(false, Ordering::SeqCst);
+    });
+
+    Ok(BackendChild::Packaged {
+        child: Some(child),
+        running,
+        termination,
+    })
+}
+
+#[cfg(debug_assertions)]
+fn spawn_python_backend(
+    connection_file: &Path,
+    jobs_directory: &Path,
+) -> Result<BackendChild, String> {
+    let pipeline_directory = find_pipeline_directory()?;
+    let python_executable = find_python_executable(&pipeline_directory)?;
+
+    let child = Command::new(&python_executable)
+        .current_dir(&pipeline_directory)
+        .arg("-m")
+        .arg("api.sidecar")
+        .arg("--connection-file")
+        .arg(connection_file)
+        .arg("--jobs-dir")
+        .arg(jobs_directory)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .map_err(|error| format!("Impossible de démarrer le backend Python : {error}"))?;
+
+    Ok(BackendChild::Python(child))
+}
+
+fn spawn_pipeline_backend(
+    app: &tauri::AppHandle,
+    connection_file: &Path,
+    jobs_directory: &Path,
+) -> Result<BackendChild, String> {
+    match spawn_packaged_backend(app, connection_file, jobs_directory) {
+        Ok(child) => Ok(child),
+        Err(packaged_error) => {
+            #[cfg(debug_assertions)]
+            {
+                eprintln!(
+                    "Sidecar empaqueté indisponible, utilisation du runtime Python : {}",
+                    packaged_error,
+                );
+
+                spawn_python_backend(connection_file, jobs_directory)
+            }
+
+            #[cfg(not(debug_assertions))]
+            {
+                Err(packaged_error)
+            }
+        }
+    }
 }
 
 fn process_to_status(process: &BackendProcess) -> BackendStatus {
     BackendStatus {
         running: true,
-        pid: Some(process.child.id()),
+        pid: Some(process.child.pid()),
         base_url: Some(process.connection.base_url.clone()),
         token: Some(process.connection.token.clone()),
         health_url: Some(process.connection.health_url.clone()),
@@ -195,20 +381,12 @@ fn start_pipeline_backend(
         .map_err(|_| "État du backend local inaccessible.".to_string())?;
 
     if let Some(process) = process_guard.as_mut() {
-        if process
-            .child
-            .try_wait()
-            .map_err(|error| error.to_string())?
-            .is_none()
-        {
+        if process.child.is_running()? {
             return Ok(process_to_status(process));
         }
 
         *process_guard = None;
     }
-
-    let pipeline_directory = find_pipeline_directory()?;
-    let python_executable = find_python_executable(&pipeline_directory)?;
 
     let application_data_directory = app
         .path()
@@ -234,31 +412,18 @@ fn start_pipeline_backend(
             .map_err(|error| format!("Impossible de supprimer l'ancienne connexion : {error}"))?;
     }
 
-    let mut child = Command::new(&python_executable)
-        .current_dir(&pipeline_directory)
-        .arg("-m")
-        .arg("api.sidecar")
-        .arg("--connection-file")
-        .arg(&connection_file)
-        .arg("--jobs-dir")
-        .arg(&jobs_directory)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .map_err(|error| format!("Impossible de démarrer le backend Python : {error}"))?;
+    let mut child = spawn_pipeline_backend(&app, &connection_file, &jobs_directory)?;
 
     let connection = match wait_for_connection_file(&connection_file, &mut child) {
         Ok(connection) => connection,
         Err(error) => {
             let _ = child.kill();
-            let _ = child.wait();
             return Err(error);
         }
     };
 
     if let Err(error) = wait_for_backend_ready(&connection, &mut child) {
         let _ = child.kill();
-        let _ = child.wait();
         let _ = fs::remove_file(&connection_file);
         return Err(error);
     }
@@ -298,26 +463,27 @@ fn get_pipeline_backend_status(
         });
     };
 
-    match process.child.try_wait() {
-        Ok(None) => Ok(process_to_status(process)),
-        Ok(Some(exit_status)) => {
-            let error = format!("Le backend s'est arrêté avec le statut {exit_status}.");
-
-            *process_guard = None;
-
-            Ok(BackendStatus {
-                running: false,
-                pid: None,
-                base_url: None,
-                token: None,
-                health_url: None,
-                connection_file: None,
-                jobs_dir: None,
-                error: Some(error),
-            })
-        }
-        Err(error) => Err(format!("Impossible de vérifier le backend : {error}")),
+    if process.child.is_running()? {
+        return Ok(process_to_status(process));
     }
+
+    let error = process
+        .child
+        .termination_message()
+        .unwrap_or_else(|| "Le backend local s'est arrêté.".to_string());
+
+    *process_guard = None;
+
+    Ok(BackendStatus {
+        running: false,
+        pid: None,
+        base_url: None,
+        token: None,
+        health_url: None,
+        connection_file: None,
+        jobs_dir: None,
+        error: Some(error),
+    })
 }
 
 #[tauri::command]
@@ -330,12 +496,7 @@ fn stop_pipeline_backend(
         .map_err(|_| "État du backend local inaccessible.".to_string())?;
 
     if let Some(mut process) = process_guard.take() {
-        process
-            .child
-            .kill()
-            .map_err(|error| format!("Impossible d'arrêter le backend Python : {error}"))?;
-
-        let _ = process.child.wait();
+        process.child.kill()?;
         let _ = fs::remove_file(&process.connection_file);
     }
 
@@ -419,18 +580,11 @@ async fn upload_pipeline_file(
             .as_mut()
             .ok_or_else(|| "Le moteur local n'est pas démarré.".to_string())?;
 
-        if process
-            .child
-            .try_wait()
-            .map_err(|error| {
-                format!(
-                    "Impossible de vérifier le backend : \
-                     {error}"
-                )
-            })?
-            .is_some()
-        {
-            return Err("Le moteur local s'est arrêté.".to_string());
+        if !process.child.is_running()? {
+            return Err(process
+                .child
+                .termination_message()
+                .unwrap_or_else(|| "Le moteur local s'est arrêté.".to_string()));
         }
 
         process.connection.clone()
