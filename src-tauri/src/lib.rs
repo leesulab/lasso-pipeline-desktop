@@ -57,40 +57,26 @@ struct PipelineBackendState {
 }
 
 fn find_pipeline_directory() -> Result<PathBuf, String> {
-    if let Ok(configured_directory) = env::var(
-        "PIPELINE_BACKEND_DIR",
-    ) {
+    if let Ok(configured_directory) = env::var("PIPELINE_BACKEND_DIR") {
         let directory = PathBuf::from(configured_directory)
             .canonicalize()
-            .map_err(|error| {
-                format!(
-                    "Dossier PIPELINE_BACKEND_DIR invalide : {error}"
-                )
-            })?;
+            .map_err(|error| format!("Dossier PIPELINE_BACKEND_DIR invalide : {error}"))?;
 
         return Ok(directory);
     }
 
-    let current_directory = env::current_dir().map_err(|error| {
-        format!(
-            "Impossible de déterminer le dossier courant : {error}"
-        )
-    })?;
+    let current_directory = env::current_dir()
+        .map_err(|error| format!("Impossible de déterminer le dossier courant : {error}"))?;
 
     for ancestor in current_directory.ancestors() {
-        let candidate = ancestor.join(
-            "pipeline_identification_ms",
-        );
+        let candidate = ancestor.join("pipeline_identification_ms");
 
         let main_file = candidate.join("main.py");
         let api_file = candidate.join("api").join("sidecar.py");
 
         if main_file.is_file() && api_file.is_file() {
             return candidate.canonicalize().map_err(|error| {
-                format!(
-                    "Impossible de résoudre {} : {error}",
-                    candidate.display()
-                )
+                format!("Impossible de résoudre {} : {error}", candidate.display())
             });
         }
     }
@@ -101,9 +87,7 @@ fn find_pipeline_directory() -> Result<PathBuf, String> {
     ))
 }
 
-fn find_python_executable(
-    pipeline_directory: &Path,
-) -> Result<PathBuf, String> {
+fn find_python_executable(pipeline_directory: &Path) -> Result<PathBuf, String> {
     #[cfg(target_os = "windows")]
     let executable = pipeline_directory
         .join(".venv")
@@ -111,10 +95,7 @@ fn find_python_executable(
         .join("python.exe");
 
     #[cfg(not(target_os = "windows"))]
-    let executable = pipeline_directory
-        .join(".venv")
-        .join("bin")
-        .join("python");
+    let executable = pipeline_directory.join(".venv").join("bin").join("python");
 
     if !executable.is_file() {
         return Err(format!(
@@ -131,11 +112,10 @@ fn wait_for_connection_file(
     child: &mut Child,
 ) -> Result<ConnectionInfo, String> {
     for _ in 0..100 {
-        if let Some(exit_status) = child.try_wait().map_err(|error| {
-            format!(
-                "Impossible de vérifier le processus Python : {error}"
-            )
-        })? {
+        if let Some(exit_status) = child
+            .try_wait()
+            .map_err(|error| format!("Impossible de vérifier le processus Python : {error}"))?
+        {
             return Err(format!(
                 "Le backend Python s'est arrêté prématurément : \
                  {exit_status}"
@@ -143,20 +123,12 @@ fn wait_for_connection_file(
         }
 
         if connection_file.is_file() {
-            let content = fs::read_to_string(connection_file).map_err(
-                |error| {
-                    format!(
-                        "Impossible de lire {} : {error}",
-                        connection_file.display()
-                    )
-                },
-            )?;
+            let content = fs::read_to_string(connection_file).map_err(|error| {
+                format!("Impossible de lire {} : {error}", connection_file.display())
+            })?;
 
-            return serde_json::from_str(&content).map_err(|error| {
-                format!(
-                    "Fichier de connexion JSON invalide : {error}"
-                )
-            });
+            return serde_json::from_str(&content)
+                .map_err(|error| format!("Fichier de connexion JSON invalide : {error}"));
         }
 
         thread::sleep(Duration::from_millis(100));
@@ -169,42 +141,23 @@ fn wait_for_connection_file(
     )
 }
 
-fn wait_for_backend_ready(
-    connection: &ConnectionInfo,
-    child: &mut Child,
-) -> Result<(), String> {
+fn wait_for_backend_ready(connection: &ConnectionInfo, child: &mut Child) -> Result<(), String> {
     let ip_address = IpAddr::from_str(&connection.host)
-        .map_err(|error| {
-            format!(
-                "Adresse du backend invalide {} : {error}",
-                connection.host
-            )
-        })?;
+        .map_err(|error| format!("Adresse du backend invalide {} : {error}", connection.host))?;
 
-    let socket_address = SocketAddr::new(
-        ip_address,
-        connection.port,
-    );
+    let socket_address = SocketAddr::new(ip_address, connection.port);
 
     for _ in 0..100 {
-        if let Some(exit_status) = child.try_wait().map_err(
-            |error| {
-                format!(
-                    "Impossible de vérifier le backend : {error}"
-                )
-            },
-        )? {
+        if let Some(exit_status) = child
+            .try_wait()
+            .map_err(|error| format!("Impossible de vérifier le backend : {error}"))?
+        {
             return Err(format!(
                 "Le backend Python s'est arrêté prématurément :                  {exit_status}"
             ));
         }
 
-        if TcpStream::connect_timeout(
-            &socket_address,
-            Duration::from_millis(100),
-        )
-        .is_ok()
-        {
+        if TcpStream::connect_timeout(&socket_address, Duration::from_millis(100)).is_ok() {
             return Ok(());
         }
 
@@ -217,7 +170,6 @@ fn wait_for_backend_ready(
     ))
 }
 
-
 fn process_to_status(process: &BackendProcess) -> BackendStatus {
     BackendStatus {
         running: true,
@@ -225,9 +177,7 @@ fn process_to_status(process: &BackendProcess) -> BackendStatus {
         base_url: Some(process.connection.base_url.clone()),
         token: Some(process.connection.token.clone()),
         health_url: Some(process.connection.health_url.clone()),
-        connection_file: Some(
-            process.connection_file.display().to_string(),
-        ),
+        connection_file: Some(process.connection_file.display().to_string()),
         jobs_dir: Some(process.jobs_dir.display().to_string()),
         error: None,
     }
@@ -238,9 +188,10 @@ fn start_pipeline_backend(
     app: tauri::AppHandle,
     state: tauri::State<'_, PipelineBackendState>,
 ) -> Result<BackendStatus, String> {
-    let mut process_guard = state.process.lock().map_err(|_| {
-        "État du backend local inaccessible.".to_string()
-    })?;
+    let mut process_guard = state
+        .process
+        .lock()
+        .map_err(|_| "État du backend local inaccessible.".to_string())?;
 
     if let Some(process) = process_guard.as_mut() {
         if process
@@ -256,23 +207,16 @@ fn start_pipeline_backend(
     }
 
     let pipeline_directory = find_pipeline_directory()?;
-    let python_executable =
-        find_python_executable(&pipeline_directory)?;
+    let python_executable = find_python_executable(&pipeline_directory)?;
 
     let application_data_directory = app
         .path()
         .app_local_data_dir()
-        .map_err(|error| {
-            format!(
-                "Dossier local de l'application indisponible : {error}"
-            )
-        })?;
+        .map_err(|error| format!("Dossier local de l'application indisponible : {error}"))?;
 
-    let runtime_directory =
-        application_data_directory.join("runtime");
+    let runtime_directory = application_data_directory.join("runtime");
     let jobs_directory = application_data_directory.join("jobs");
-    let connection_file =
-        runtime_directory.join("pipeline-api.json");
+    let connection_file = runtime_directory.join("pipeline-api.json");
 
     fs::create_dir_all(&runtime_directory).map_err(|error| {
         format!(
@@ -281,19 +225,12 @@ fn start_pipeline_backend(
         )
     })?;
 
-    fs::create_dir_all(&jobs_directory).map_err(|error| {
-        format!(
-            "Impossible de créer {} : {error}",
-            jobs_directory.display()
-        )
-    })?;
+    fs::create_dir_all(&jobs_directory)
+        .map_err(|error| format!("Impossible de créer {} : {error}", jobs_directory.display()))?;
 
     if connection_file.exists() {
-        fs::remove_file(&connection_file).map_err(|error| {
-            format!(
-                "Impossible de supprimer l'ancienne connexion : {error}"
-            )
-        })?;
+        fs::remove_file(&connection_file)
+            .map_err(|error| format!("Impossible de supprimer l'ancienne connexion : {error}"))?;
     }
 
     let mut child = Command::new(&python_executable)
@@ -307,26 +244,18 @@ fn start_pipeline_backend(
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()
-        .map_err(|error| {
-            format!(
-                "Impossible de démarrer le backend Python : {error}"
-            )
-        })?;
+        .map_err(|error| format!("Impossible de démarrer le backend Python : {error}"))?;
 
-    let connection =
-        match wait_for_connection_file(&connection_file, &mut child) {
-            Ok(connection) => connection,
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(error);
-            }
-        };
+    let connection = match wait_for_connection_file(&connection_file, &mut child) {
+        Ok(connection) => connection,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
+    };
 
-    if let Err(error) = wait_for_backend_ready(
-        &connection,
-        &mut child,
-    ) {
+    if let Err(error) = wait_for_backend_ready(&connection, &mut child) {
         let _ = child.kill();
         let _ = child.wait();
         let _ = fs::remove_file(&connection_file);
@@ -350,9 +279,10 @@ fn start_pipeline_backend(
 fn get_pipeline_backend_status(
     state: tauri::State<'_, PipelineBackendState>,
 ) -> Result<BackendStatus, String> {
-    let mut process_guard = state.process.lock().map_err(|_| {
-        "État du backend local inaccessible.".to_string()
-    })?;
+    let mut process_guard = state
+        .process
+        .lock()
+        .map_err(|_| "État du backend local inaccessible.".to_string())?;
 
     let Some(process) = process_guard.as_mut() else {
         return Ok(BackendStatus {
@@ -370,9 +300,7 @@ fn get_pipeline_backend_status(
     match process.child.try_wait() {
         Ok(None) => Ok(process_to_status(process)),
         Ok(Some(exit_status)) => {
-            let error = format!(
-                "Le backend s'est arrêté avec le statut {exit_status}."
-            );
+            let error = format!("Le backend s'est arrêté avec le statut {exit_status}.");
 
             *process_guard = None;
 
@@ -387,9 +315,7 @@ fn get_pipeline_backend_status(
                 error: Some(error),
             })
         }
-        Err(error) => Err(format!(
-            "Impossible de vérifier le backend : {error}"
-        )),
+        Err(error) => Err(format!("Impossible de vérifier le backend : {error}")),
     }
 }
 
@@ -397,16 +323,16 @@ fn get_pipeline_backend_status(
 fn stop_pipeline_backend(
     state: tauri::State<'_, PipelineBackendState>,
 ) -> Result<BackendStatus, String> {
-    let mut process_guard = state.process.lock().map_err(|_| {
-        "État du backend local inaccessible.".to_string()
-    })?;
+    let mut process_guard = state
+        .process
+        .lock()
+        .map_err(|_| "État du backend local inaccessible.".to_string())?;
 
     if let Some(mut process) = process_guard.take() {
-        process.child.kill().map_err(|error| {
-            format!(
-                "Impossible d'arrêter le backend Python : {error}"
-            )
-        })?;
+        process
+            .child
+            .kill()
+            .map_err(|error| format!("Impossible d'arrêter le backend Python : {error}"))?;
 
         let _ = process.child.wait();
         let _ = fs::remove_file(&process.connection_file);
@@ -427,6 +353,7 @@ fn stop_pipeline_backend(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(PipelineBackendState::default())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
