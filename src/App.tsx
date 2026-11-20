@@ -18,66 +18,15 @@ import {
   Server,
   UploadCloud,
 } from "lucide-react";
+import { usePipelineData } from "./usePipelineData";
 import "./App.css";
 
-type JobStatus = "success" | "running" | "error";
+type JobStatus =
+  | "created"
+  | "success"
+  | "running"
+  | "error";
 type View = "overview" | "new" | "jobs" | "results";
-
-type Job = {
-  id: string;
-  name: string;
-  status: JobStatus;
-  progress: number;
-  step: string;
-  updated: string;
-};
-
-type PipelineStep = {
-  id: string;
-  label: string;
-};
-
-const initialJobs: Job[] = [
-  {
-    id: "b8d2…91ec",
-    name: "Observatoire HRMS · Bougival",
-    status: "success",
-    progress: 100,
-    step: "Terminé",
-    updated: "Aujourd’hui, 17:42",
-  },
-  {
-    id: "2a41…d067",
-    name: "Campagne Seine · Lot 04",
-    status: "running",
-    progress: 42,
-    step: "Traitement des échantillons",
-    updated: "Aujourd’hui, 18:31",
-  },
-  {
-    id: "fa09…38bd",
-    name: "Essai calibration",
-    status: "error",
-    progress: 5,
-    step: "Calibration absente",
-    updated: "Hier, 16:08",
-  },
-];
-
-const pipelineSteps: PipelineStep[] = [
-  { id: "calibration", label: "Calibration CCS" },
-  { id: "identification", label: "Base d’identification" },
-  { id: "file_discovery", label: "Détection des fichiers" },
-  { id: "blanks", label: "Traitement des blanks" },
-  { id: "samples", label: "Traitement des échantillons" },
-  {
-    id: "feature_alignment",
-    label: "Alignement et identification",
-  },
-  { id: "visualizations", label: "Visualisations" },
-  { id: "similarities", label: "Similarités" },
-  { id: "categories", label: "Catégories" },
-];
 
 const navigation = [
   {
@@ -104,6 +53,7 @@ const navigation = [
 
 function StatusBadge({ status }: { status: JobStatus }) {
   const labels: Record<JobStatus, string> = {
+    created: "Créé",
     success: "Terminé",
     running: "En cours",
     error: "Erreur",
@@ -141,10 +91,16 @@ function App() {
   const [backendLoading, setBackendLoading] = useState(true);
   const [backendActionPending, setBackendActionPending] =
     useState(false);
-  const [jobs, setJobs] = useState<Job[]>(initialJobs);
-  const [selectedSteps, setSelectedSteps] = useState<string[]>(
-    pipelineSteps.map((step) => step.id),
-  );
+  const {
+    steps: pipelineSteps,
+    jobs,
+    loading: pipelineDataLoading,
+    error: pipelineDataError,
+    refresh: refreshPipelineData,
+  } = usePipelineData(backendStatus);
+
+  const [selectedSteps, setSelectedSteps] =
+    useState<string[]>([]);
   const [view, setView] = useState<View>("overview");
 
   const runningJobs = useMemo(
@@ -153,6 +109,17 @@ function App() {
   );
 
   const engineStarted = backendStatus.running;
+
+  useEffect(() => {
+    if (
+      pipelineSteps.length > 0 &&
+      selectedSteps.length === 0
+    ) {
+      setSelectedSteps(
+        pipelineSteps.map((step) => step.id),
+      );
+    }
+  }, [pipelineSteps, selectedSteps.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -217,25 +184,6 @@ function App() {
     );
   }
 
-  function createDemoJob() {
-    const firstStep =
-      pipelineSteps.find((step) =>
-        selectedSteps.includes(step.id),
-      )?.label ?? "En attente";
-
-    const newJob: Job = {
-      id: "new…local",
-      name: "Nouvelle analyse locale",
-      status: "running",
-      progress: 0,
-      step: firstStep,
-      updated: "À l’instant",
-    };
-
-    setJobs((current) => [newJob, ...current]);
-    setView("jobs");
-  }
-
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -291,6 +239,37 @@ function App() {
         <div className="backend-error-panel">
           <strong>Échec du démarrage du moteur</strong>
           <span>{backendStatus.error}</span>
+        </div>
+      )}
+
+      {engineStarted && (
+        <div className="pipeline-data-toolbar">
+          <span>
+            {pipelineDataLoading
+              ? "Chargement des données du moteur…"
+              : `${pipelineSteps.length} étapes · ${jobs.length} analyses`}
+          </span>
+
+          <button
+            className="refresh-data-button"
+            onClick={() => void refreshPipelineData()}
+            disabled={pipelineDataLoading}
+          >
+            <RefreshCw
+              size={14}
+              className={
+                pipelineDataLoading ? "icon-spinning" : ""
+              }
+            />
+            Actualiser
+          </button>
+        </div>
+      )}
+
+      {pipelineDataError && (
+        <div className="backend-error-panel">
+          <strong>Impossible de charger les données</strong>
+          <span>{pipelineDataError}</span>
         </div>
       )}
 
@@ -378,6 +357,12 @@ function App() {
                     <h3>Activité récente</h3>
                   </div>
 
+                  {jobs.length === 0 && (
+                    <div className="empty-state">
+                      Aucune analyse persistante.
+                    </div>
+                  )}
+
                   {jobs.slice(0, 3).map((job) => (
                     <div
                       className="activity-row"
@@ -457,14 +442,14 @@ function App() {
 
                     <button
                       className="button button-primary"
-                      disabled={
-                        !engineStarted ||
-                        selectedSteps.length === 0
+                      disabled
+                      title={
+                        "La création de jobs sera raccordée " +
+                        "à l'API à l'étape suivante."
                       }
-                      onClick={createDemoJob}
                     >
                       <Play size={17} />
-                      Créer et lancer
+                      Création API à connecter
                     </button>
                   </div>
                 </article>
@@ -484,6 +469,12 @@ function App() {
                 </div>
 
                 <div className="jobs-list">
+                  {jobs.length === 0 && (
+                    <article className="card empty-state">
+                      Aucun job n'a encore été créé.
+                    </article>
+                  )}
+
                   {jobs.map((job) => (
                     <article
                       className="card job-card"

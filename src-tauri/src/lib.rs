@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::{
     env, fs,
+    net::{IpAddr, SocketAddr, TcpStream},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
+    str::FromStr,
     sync::Mutex,
     thread,
     time::Duration,
@@ -167,6 +169,55 @@ fn wait_for_connection_file(
     )
 }
 
+fn wait_for_backend_ready(
+    connection: &ConnectionInfo,
+    child: &mut Child,
+) -> Result<(), String> {
+    let ip_address = IpAddr::from_str(&connection.host)
+        .map_err(|error| {
+            format!(
+                "Adresse du backend invalide {} : {error}",
+                connection.host
+            )
+        })?;
+
+    let socket_address = SocketAddr::new(
+        ip_address,
+        connection.port,
+    );
+
+    for _ in 0..100 {
+        if let Some(exit_status) = child.try_wait().map_err(
+            |error| {
+                format!(
+                    "Impossible de vérifier le backend : {error}"
+                )
+            },
+        )? {
+            return Err(format!(
+                "Le backend Python s'est arrêté prématurément :                  {exit_status}"
+            ));
+        }
+
+        if TcpStream::connect_timeout(
+            &socket_address,
+            Duration::from_millis(100),
+        )
+        .is_ok()
+        {
+            return Ok(());
+        }
+
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    Err(format!(
+        "Le backend n'écoute pas sur {} après 10 secondes.",
+        socket_address
+    ))
+}
+
+
 fn process_to_status(process: &BackendProcess) -> BackendStatus {
     BackendStatus {
         running: true,
@@ -271,6 +322,16 @@ fn start_pipeline_backend(
                 return Err(error);
             }
         };
+
+    if let Err(error) = wait_for_backend_ready(
+        &connection,
+        &mut child,
+    ) {
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = fs::remove_file(&connection_file);
+        return Err(error);
+    }
 
     let process = BackendProcess {
         child,

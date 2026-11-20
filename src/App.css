@@ -512,3 +512,53 @@ button:disabled {
 .backend-error-panel strong {
   font-size: 14px;
 }
+
+.status-created {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.pipeline-data-toolbar {
+  width: min(1232px, calc(100% - 48px));
+  margin: 10px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.refresh-data-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: transparent;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.refresh-data-button:hover:not(:disabled) {
+  background: #f0fdfa;
+}
+
+.icon-spinning {
+  animation: icon-spin 900ms linear infinite;
+}
+
+.empty-state {
+  padding: 22px;
+  color: #64748b;
+  font-size: 14px;
+  text-align: center;
+}
+
+@keyframes icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
