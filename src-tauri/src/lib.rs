@@ -817,9 +817,22 @@ async fn export_pipeline_file(
     Ok(copied_bytes)
 }
 
+fn shutdown_pipeline_backend(app: &tauri::AppHandle) {
+    let state = app.state::<PipelineBackendState>();
+
+    let Ok(mut process_guard) = state.process.lock() else {
+        return;
+    };
+
+    if let Some(mut process) = process_guard.take() {
+        let _ = process.child.kill();
+        let _ = fs::remove_file(&process.connection_file);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(PipelineBackendState::default())
@@ -832,6 +845,21 @@ pub fn run() {
             open_pipeline_file,
             export_pipeline_file,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| match event {
+        tauri::RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::Destroyed,
+            ..
+        } if label == "main" => {
+            shutdown_pipeline_backend(app_handle);
+            app_handle.exit(0);
+        }
+        tauri::RunEvent::ExitRequested { .. } => {
+            shutdown_pipeline_backend(app_handle);
+        }
+        _ => {}
+    });
 }
