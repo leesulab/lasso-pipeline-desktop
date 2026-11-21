@@ -26,5 +26,12 @@
     "@vitejs/plugin-react": "^6.0.2",
     "typescript": "~6.0.3",
     "vite": "^8.0.16"
+  },
+  "description": "Application de bureau locale pour l'exécution, le suivi et l'export des analyses HRMS LASSO.",
+  "author": "Julien Le Roux",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22 <23",
+    "npm": ">=10"
   }
 }
