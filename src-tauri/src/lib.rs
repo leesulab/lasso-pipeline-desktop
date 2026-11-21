@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
+#[cfg(debug_assertions)]
+use std::process::{Command, Stdio};
 use std::{
     env, fs,
     net::{IpAddr, SocketAddr, TcpStream},
     path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
+    process::Child,
     str::FromStr,
     sync::{
         Arc, Mutex,
@@ -12,6 +14,7 @@ use std::{
     thread,
     time::Duration,
 };
+
 use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::{
@@ -45,6 +48,7 @@ struct BackendStatus {
 }
 
 enum BackendChild {
+    #[cfg_attr(not(debug_assertions), allow(dead_code))]
     Python(Child),
     Packaged {
         child: Option<CommandChild>,
@@ -123,6 +127,7 @@ struct PipelineBackendState {
     process: Mutex<Option<BackendProcess>>,
 }
 
+#[cfg_attr(not(debug_assertions), allow(dead_code))]
 fn find_pipeline_directory() -> Result<PathBuf, String> {
     if let Ok(configured_directory) = env::var("PIPELINE_BACKEND_DIR") {
         let directory = PathBuf::from(configured_directory)
@@ -154,6 +159,7 @@ fn find_pipeline_directory() -> Result<PathBuf, String> {
     ))
 }
 
+#[cfg_attr(not(debug_assertions), allow(dead_code))]
 fn find_python_executable(pipeline_directory: &Path) -> Result<PathBuf, String> {
     #[cfg(target_os = "windows")]
     let executable = pipeline_directory
