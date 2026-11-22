@@ -232,3 +232,125 @@ export async function fetchPipelineFiles(
     category: file.category,
   }));
 }
+
+export type PipelineParameterType =
+  | "boolean"
+  | "integer"
+  | "number"
+  | "string";
+
+export type PipelineParameterSchema = {
+  path: string;
+  label: string;
+  type: PipelineParameterType;
+  default: boolean | number | string;
+  required: boolean;
+  description: string | null;
+  unit: string | null;
+  minimum: number | null;
+  maximum: number | null;
+  step: number | null;
+  choices: string[] | null;
+  group: string | null;
+};
+
+export type PipelineSectionSchema = {
+  id: string;
+  label: string;
+  className: string;
+  parameters: PipelineParameterSchema[];
+};
+
+export type PipelineSchema = {
+  version: number;
+  sections: PipelineSectionSchema[];
+};
+
+/**
+ * Configuration éditable envoyée par l'interface.
+ *
+ * Les paramètres imbriqués utilisent des chemins pointés :
+ * "weights.mz", "tolerances.ccs_percent", etc.
+ */
+export type PipelineConfiguration = Record<
+  string,
+  Record<string, unknown>
+>;
+
+/**
+ * Configuration normalisée renvoyée par l'API.
+ *
+ * Les chemins pointés y sont reconstruits en objets imbriqués.
+ */
+export type NormalizedPipelineConfiguration = Record<
+  string,
+  Record<string, unknown>
+>;
+
+export type ConfigurationValidationResult = {
+  valid: boolean;
+  configuration: NormalizedPipelineConfiguration;
+  errors: string[];
+};
+
+type ApiPipelineSectionSchema = {
+  id: string;
+  label: string;
+  class_name: string;
+  parameters: PipelineParameterSchema[];
+};
+
+type ApiPipelineSchema = {
+  version: number;
+  sections: ApiPipelineSectionSchema[];
+};
+
+type ApiConfigurationValidationResult = {
+  valid: boolean;
+  configuration: NormalizedPipelineConfiguration;
+  errors: string[];
+};
+
+function mapPipelineSchema(
+  schema: ApiPipelineSchema,
+): PipelineSchema {
+  return {
+    version: schema.version,
+    sections: schema.sections.map((section) => ({
+      id: section.id,
+      label: section.label,
+      className: section.class_name,
+      parameters: section.parameters,
+    })),
+  };
+}
+
+export async function fetchPipelineSchema(
+  backend: BackendStatus,
+): Promise<PipelineSchema> {
+  const schema = await apiRequest<ApiPipelineSchema>(
+    backend,
+    "/api/v1/pipeline/schema",
+  );
+
+  return mapPipelineSchema(schema);
+}
+
+export async function validatePipelineConfiguration(
+  backend: BackendStatus,
+  configuration: PipelineConfiguration,
+): Promise<ConfigurationValidationResult> {
+  return apiRequest<ApiConfigurationValidationResult>(
+    backend,
+    "/api/v1/pipeline/configuration/validate",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        configuration,
+      }),
+    },
+  );
+}
