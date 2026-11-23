@@ -149,6 +149,8 @@ export async function createPipelineJob(
   backend: BackendStatus,
   steps: string[],
   projectName: string,
+  pipelineConfiguration:
+    NormalizedPipelineConfiguration,
 ): Promise<PipelineJob> {
   const job = await apiRequest<ApiJobResponse>(
     backend,
@@ -162,6 +164,8 @@ export async function createPipelineJob(
         steps,
         parameters: {
           project: projectName,
+          pipeline_configuration:
+            pipelineConfiguration,
         },
       }),
     },

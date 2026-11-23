@@ -475,10 +475,24 @@ function App() {
     setJobActionError(null);
 
     try {
+      const configurationValidation =
+        await validateCurrentPipelineConfiguration();
+
+      if (!configurationValidation.valid) {
+        setJobActionError(
+          "La configuration de la pipeline contient " +
+            "des erreurs. Corrigez les paramètres " +
+            "signalés avant de lancer l’analyse.",
+        );
+        setView("new");
+        return;
+      }
+
       const createdJob = await createPipelineJob(
         backendStatus,
         selectedSteps,
         projectName.trim() || "Analyse locale",
+        configurationValidation.configuration,
       );
 
       await refreshPipelineData();
@@ -947,6 +961,9 @@ function App() {
                       disabled={
                         !engineStarted ||
                         selectedSteps.length === 0 ||
+                        pipelineConfigurationLoading ||
+                        pipelineConfigurationValidating ||
+                        !pipelineConfigurationSchema ||
                         jobActionPending
                       }
                       onClick={() =>
