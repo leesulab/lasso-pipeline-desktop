@@ -26,6 +26,12 @@ import {
 } from "./monitorPipelineJob";
 import { usePipelineData } from "./usePipelineData";
 import {
+  usePipelineConfiguration,
+} from "./usePipelineConfiguration";
+import {
+  PipelineConfigurationPanel,
+} from "./PipelineConfigurationPanel";
+import {
   formatFileSize,
   getPipelineFileName,
   usePipelineFiles,
@@ -131,6 +137,20 @@ function App() {
     error: pipelineDataError,
     refresh: refreshPipelineData,
   } = usePipelineData(backendStatus);
+
+  const {
+    schema: pipelineConfigurationSchema,
+    configuration: pipelineConfiguration,
+    validation: pipelineConfigurationValidation,
+    loading: pipelineConfigurationLoading,
+    validating: pipelineConfigurationValidating,
+    error: pipelineConfigurationError,
+    setParameter: setPipelineConfigurationParameter,
+    resetParameter: resetPipelineConfigurationParameter,
+    resetSection: resetPipelineConfigurationSection,
+    resetAll: resetPipelineConfiguration,
+    validate: validateCurrentPipelineConfiguration,
+  } = usePipelineConfiguration(backendStatus);
 
   const [selectedSteps, setSelectedSteps] =
     useState<string[]>([]);
@@ -732,6 +752,30 @@ function App() {
                     </p>
                   </div>
                 </div>
+
+                <PipelineConfigurationPanel
+                  schema={pipelineConfigurationSchema}
+                  configuration={pipelineConfiguration}
+                  validation={pipelineConfigurationValidation}
+                  loading={pipelineConfigurationLoading}
+                  validating={pipelineConfigurationValidating}
+                  error={pipelineConfigurationError}
+                  onParameterChange={
+                    setPipelineConfigurationParameter
+                  }
+                  onResetParameter={
+                    resetPipelineConfigurationParameter
+                  }
+                  onResetSection={
+                    resetPipelineConfigurationSection
+                  }
+                  onResetAll={
+                    resetPipelineConfiguration
+                  }
+                  onValidate={
+                    validateCurrentPipelineConfiguration
+                  }
+                />
 
                 <article className="card pipeline-card">
                   <label className="project-field">
