@@ -728,6 +728,53 @@ fn resolve_local_job_file(
     Ok(target_file)
 }
 
+const MAX_PRESET_BYTES: u64 = 1024 * 1024;
+
+#[tauri::command]
+fn read_pipeline_preset(file_path: String) -> Result<String, String> {
+    let preset_file = PathBuf::from(&file_path)
+        .canonicalize()
+        .map_err(|error| format!("Preset introuvable {file_path} : {error}"))?;
+
+    if !preset_file.is_file() {
+        return Err(format!(
+            "Le preset sélectionné n'est pas un fichier : {}",
+            preset_file.display()
+        ));
+    }
+
+    let extension_is_json = preset_file
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("json"))
+        .unwrap_or(false);
+
+    if !extension_is_json {
+        return Err("Le preset doit être un fichier JSON.".to_string());
+    }
+
+    let metadata = fs::metadata(&preset_file).map_err(|error| {
+        format!(
+            "Impossible de lire les métadonnées de {} : {error}",
+            preset_file.display()
+        )
+    })?;
+
+    if metadata.len() > MAX_PRESET_BYTES {
+        return Err(format!(
+            "Le preset dépasse la limite de 1 Mio : {} octets.",
+            metadata.len()
+        ));
+    }
+
+    fs::read_to_string(&preset_file).map_err(|error| {
+        format!(
+            "Impossible de lire le preset {} : {error}",
+            preset_file.display()
+        )
+    })
+}
+
 #[tauri::command]
 fn open_pipeline_file(
     app: tauri::AppHandle,
@@ -842,6 +889,7 @@ pub fn run() {
             get_pipeline_backend_status,
             stop_pipeline_backend,
             upload_pipeline_file,
+            read_pipeline_preset,
             open_pipeline_file,
             export_pipeline_file,
         ])

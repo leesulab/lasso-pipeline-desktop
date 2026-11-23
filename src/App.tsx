@@ -141,6 +141,9 @@ function App() {
   const {
     schema: pipelineConfigurationSchema,
     configuration: pipelineConfiguration,
+    presets: pipelinePresets,
+    activePresetId: activePipelinePresetId,
+    presetValidation: pipelinePresetValidation,
     validation: pipelineConfigurationValidation,
     loading: pipelineConfigurationLoading,
     validating: pipelineConfigurationValidating,
@@ -149,6 +152,8 @@ function App() {
     resetParameter: resetPipelineConfigurationParameter,
     resetSection: resetPipelineConfigurationSection,
     resetAll: resetPipelineConfiguration,
+    applyPreset: applyPipelinePreset,
+    importPreset: importPipelinePreset,
     validate: validateCurrentPipelineConfiguration,
   } = usePipelineConfiguration(backendStatus);
 
@@ -770,6 +775,9 @@ function App() {
                 <PipelineConfigurationPanel
                   schema={pipelineConfigurationSchema}
                   configuration={pipelineConfiguration}
+                  presets={pipelinePresets}
+                  activePresetId={activePipelinePresetId}
+                  presetValidation={pipelinePresetValidation}
                   validation={pipelineConfigurationValidation}
                   loading={pipelineConfigurationLoading}
                   validating={pipelineConfigurationValidating}
@@ -785,6 +793,12 @@ function App() {
                   }
                   onResetAll={
                     resetPipelineConfiguration
+                  }
+                  onApplyPreset={
+                    applyPipelinePreset
+                  }
+                  onImportPreset={
+                    importPipelinePreset
                   }
                   onValidate={
                     validateCurrentPipelineConfiguration

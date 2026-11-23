@@ -4,13 +4,19 @@ import {
   CheckCircle2,
   RotateCcw,
   Settings2,
+  Upload,
 } from "lucide-react";
 import type {
   ConfigurationValidationResult,
   PipelineConfiguration,
   PipelineParameterSchema,
+  PipelinePreset,
+  PipelinePresetValidationResult,
   PipelineSchema,
 } from "./api";
+import {
+  importPipelinePresetFile,
+} from "./pipelinePresetFileActions";
 import "./PipelineConfigurationPanel.css";
 
 type ParameterValue = boolean | number | string;
@@ -18,6 +24,10 @@ type ParameterValue = boolean | number | string;
 type PipelineConfigurationPanelProps = {
   schema: PipelineSchema | null;
   configuration: PipelineConfiguration;
+  presets: PipelinePreset[];
+  activePresetId: string | null;
+  presetValidation:
+    PipelinePresetValidationResult | null;
   validation: ConfigurationValidationResult | null;
   loading: boolean;
   validating: boolean;
@@ -33,6 +43,10 @@ type PipelineConfigurationPanelProps = {
   ) => void;
   onResetSection: (sectionId: string) => void;
   onResetAll: () => void;
+  onApplyPreset: (preset: PipelinePreset) => void;
+  onImportPreset: (
+    presetDocument: Record<string, unknown>,
+  ) => Promise<PipelinePresetValidationResult>;
   onValidate: () => Promise<ConfigurationValidationResult>;
 };
 
@@ -165,6 +179,9 @@ function ParameterControl({
 export function PipelineConfigurationPanel({
   schema,
   configuration,
+  presets,
+  activePresetId,
+  presetValidation,
   validation,
   loading,
   validating,
@@ -173,11 +190,35 @@ export function PipelineConfigurationPanel({
   onResetParameter,
   onResetSection,
   onResetAll,
+  onApplyPreset,
+  onImportPreset,
   onValidate,
 }: PipelineConfigurationPanelProps) {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(
     null,
   );
+
+  const [presetImportPending, setPresetImportPending] =
+    useState(false);
+
+  async function handleImportPreset() {
+    if (presetImportPending) {
+      return;
+    }
+
+    setPresetImportPending(true);
+
+    try {
+      const presetDocument =
+        await importPipelinePresetFile();
+
+      if (presetDocument !== null) {
+        await onImportPreset(presetDocument);
+      }
+    } finally {
+      setPresetImportPending(false);
+    }
+  }
 
   useEffect(() => {
     if (
@@ -230,6 +271,63 @@ export function PipelineConfigurationPanel({
             <strong>Configuration</strong>
             <span>{schema.sections.length} sections</span>
           </div>
+        </div>
+
+        <div className="pipeline-preset-selector">
+          <label htmlFor="pipeline-preset-select">
+            Preset
+          </label>
+
+          <select
+            id="pipeline-preset-select"
+            value={activePresetId ?? ""}
+            onChange={(event) => {
+              const preset = presets.find(
+                (item) =>
+                  item.id === event.target.value,
+              );
+
+              if (preset) {
+                onApplyPreset(preset);
+              }
+            }}
+          >
+            <option value="" disabled>
+              Configuration personnalisée
+            </option>
+
+            {presets.map((preset) => (
+              <option
+                value={preset.id ?? preset.name}
+                key={preset.id ?? preset.name}
+              >
+                {preset.name}
+              </option>
+            ))}
+          </select>
+
+          {activePresetId && (
+            <small>
+              {
+                presets.find(
+                  (preset) =>
+                    preset.id === activePresetId,
+                )?.description
+              }
+            </small>
+          )}
+
+          <button
+            type="button"
+            className="pipeline-preset-import"
+            disabled={presetImportPending || validating}
+            onClick={() => void handleImportPreset()}
+          >
+            <Upload size={14} />
+            {presetImportPending
+              ? "Import en cours…"
+              : "Importer un preset JSON"}
+          </button>
         </div>
 
         <nav aria-label="Sections de configuration">
@@ -302,6 +400,25 @@ export function PipelineConfigurationPanel({
             />
           ))}
         </div>
+
+        {presetValidation &&
+          !presetValidation.valid && (
+            <div className="pipeline-config-validation is-invalid">
+              <AlertTriangle size={18} />
+              <div>
+                <strong>Preset invalide</strong>
+                <ul>
+                  {presetValidation.errors.map(
+                    (presetError) => (
+                      <li key={presetError}>
+                        {presetError}
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            </div>
+          )}
 
         {validation && (
           <div

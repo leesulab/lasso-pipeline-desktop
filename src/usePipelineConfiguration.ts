@@ -4,12 +4,19 @@ import {
   useState,
 } from "react";
 import {
+  fetchPipelinePresets,
   fetchPipelineSchema,
   validatePipelineConfiguration,
+  validatePipelinePreset,
   type ConfigurationValidationResult,
   type PipelineConfiguration,
+  type PipelinePreset,
+  type PipelinePresetValidationResult,
   type PipelineSchema,
 } from "./api";
+import {
+  normalizedToEditableConfiguration,
+} from "./pipelinePresetUtils";
 import type { BackendStatus } from "./backend";
 
 function buildDefaultConfiguration(
@@ -37,6 +44,17 @@ export function usePipelineConfiguration(
   const [configuration, setConfiguration] =
     useState<PipelineConfiguration>({});
 
+  const [presets, setPresets] =
+    useState<PipelinePreset[]>([]);
+
+  const [activePresetId, setActivePresetId] =
+    useState<string | null>(null);
+
+  const [presetValidation, setPresetValidation] =
+    useState<PipelinePresetValidationResult | null>(
+      null,
+    );
+
   const [validation, setValidation] =
     useState<ConfigurationValidationResult | null>(
       null,
@@ -53,7 +71,10 @@ export function usePipelineConfiguration(
     if (!backendStatus.running) {
       setSchema(null);
       setConfiguration({});
+      setPresets([]);
+      setActivePresetId(null);
       setValidation(null);
+      setPresetValidation(null);
       setError(null);
       return;
     }
@@ -62,18 +83,47 @@ export function usePipelineConfiguration(
     setError(null);
 
     try {
-      const loadedSchema =
-        await fetchPipelineSchema(backendStatus);
+      const [
+        loadedSchema,
+        loadedPresets,
+      ] = await Promise.all([
+        fetchPipelineSchema(backendStatus),
+        fetchPipelinePresets(backendStatus),
+      ]);
 
       setSchema(loadedSchema);
+      setPresets(loadedPresets);
+
+      const defaultPreset =
+        loadedPresets.find(
+          (preset) =>
+            preset.id === "default" &&
+            preset.builtIn,
+        ) ?? null;
+
       setConfiguration(
-        buildDefaultConfiguration(loadedSchema),
+        defaultPreset
+          ? normalizedToEditableConfiguration(
+              defaultPreset.configuration,
+              loadedSchema,
+            )
+          : buildDefaultConfiguration(
+              loadedSchema,
+            ),
+      );
+
+      setActivePresetId(
+        defaultPreset?.id ?? null,
       );
       setValidation(null);
+      setPresetValidation(null);
     } catch (loadError) {
       setSchema(null);
       setConfiguration({});
+      setPresets([]);
+      setActivePresetId(null);
       setValidation(null);
+      setPresetValidation(null);
       setError(String(loadError));
     } finally {
       setLoading(false);
@@ -98,7 +148,9 @@ export function usePipelineConfiguration(
         },
       }));
 
+      setActivePresetId(null);
       setValidation(null);
+      setPresetValidation(null);
     },
     [],
   );
@@ -165,6 +217,74 @@ export function usePipelineConfiguration(
     setValidation(null);
   }, [schema]);
 
+  const applyPreset = useCallback(
+    (preset: PipelinePreset) => {
+      if (!schema) {
+        return;
+      }
+
+      setConfiguration(
+        normalizedToEditableConfiguration(
+          preset.configuration,
+          schema,
+        ),
+      );
+
+      setActivePresetId(preset.id);
+      setValidation(null);
+      setPresetValidation(null);
+    },
+    [schema],
+  );
+
+  const importPreset = useCallback(
+    async (
+      presetDocument: Record<string, unknown>,
+    ) => {
+      if (!backendStatus.running || !schema) {
+        throw new Error(
+          "Le moteur local n'est pas disponible.",
+        );
+      }
+
+      setValidating(true);
+      setError(null);
+      setPresetValidation(null);
+
+      try {
+        const result =
+          await validatePipelinePreset(
+            backendStatus,
+            presetDocument,
+          );
+
+        setPresetValidation(result);
+
+        if (result.valid && result.preset) {
+          setConfiguration(
+            normalizedToEditableConfiguration(
+              result.preset.configuration,
+              schema,
+            ),
+          );
+
+          setActivePresetId(
+            result.preset.id,
+          );
+          setValidation(null);
+        }
+
+        return result;
+      } catch (presetError) {
+        setError(String(presetError));
+        throw presetError;
+      } finally {
+        setValidating(false);
+      }
+    },
+    [backendStatus, schema],
+  );
+
   const validate = useCallback(async () => {
     if (!backendStatus.running) {
       throw new Error(
@@ -195,6 +315,9 @@ export function usePipelineConfiguration(
   return {
     schema,
     configuration,
+    presets,
+    activePresetId,
+    presetValidation,
     validation,
     loading,
     validating,
@@ -203,6 +326,8 @@ export function usePipelineConfiguration(
     resetParameter,
     resetSection,
     resetAll,
+    applyPreset,
+    importPreset,
     validate,
     reload: load,
   };

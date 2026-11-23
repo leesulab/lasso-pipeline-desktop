@@ -95,3 +95,14 @@ export async function exportPipelineFile(
     },
   );
 }
+
+export async function readPipelinePreset(
+  filePath: string,
+): Promise<string> {
+  return invoke<string>(
+    "read_pipeline_preset",
+    {
+      filePath,
+    },
+  );
+}
