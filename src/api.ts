@@ -358,3 +358,91 @@ export async function validatePipelineConfiguration(
     },
   );
 }
+
+export type PipelinePreset = {
+  formatVersion: number;
+  schemaVersion: number;
+  id: string | null;
+  name: string;
+  description: string;
+  builtIn: boolean;
+  createdAt: string | null;
+  configuration: NormalizedPipelineConfiguration;
+};
+
+export type PipelinePresetValidationResult = {
+  valid: boolean;
+  preset: PipelinePreset | null;
+  errors: string[];
+};
+
+type ApiPipelinePreset = {
+  format_version: number;
+  schema_version: number;
+  id: string | null;
+  name: string;
+  description: string;
+  built_in: boolean;
+  created_at: string | null;
+  configuration: NormalizedPipelineConfiguration;
+};
+
+type ApiPipelinePresetValidationResult = {
+  valid: boolean;
+  preset: ApiPipelinePreset | null;
+  errors: string[];
+};
+
+function mapPipelinePreset(
+  preset: ApiPipelinePreset,
+): PipelinePreset {
+  return {
+    formatVersion: preset.format_version,
+    schemaVersion: preset.schema_version,
+    id: preset.id,
+    name: preset.name,
+    description: preset.description,
+    builtIn: preset.built_in,
+    createdAt: preset.created_at,
+    configuration: preset.configuration,
+  };
+}
+
+export async function fetchPipelinePresets(
+  backend: BackendStatus,
+): Promise<PipelinePreset[]> {
+  const presets = await apiRequest<ApiPipelinePreset[]>(
+    backend,
+    "/api/v1/pipeline/presets",
+  );
+
+  return presets.map(mapPipelinePreset);
+}
+
+export async function validatePipelinePreset(
+  backend: BackendStatus,
+  preset: Record<string, unknown>,
+): Promise<PipelinePresetValidationResult> {
+  const result =
+    await apiRequest<ApiPipelinePresetValidationResult>(
+      backend,
+      "/api/v1/pipeline/presets/validate",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          preset,
+        }),
+      },
+    );
+
+  return {
+    valid: result.valid,
+    preset: result.preset
+      ? mapPipelinePreset(result.preset)
+      : null,
+    errors: result.errors,
+  };
+}
