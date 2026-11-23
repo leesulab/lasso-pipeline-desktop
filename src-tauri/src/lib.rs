@@ -776,6 +776,77 @@ fn read_pipeline_preset(file_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn write_pipeline_preset(destination_path: String, content: String) -> Result<u64, String> {
+    let content_bytes = content.as_bytes();
+
+    if content_bytes.len() as u64 > MAX_PRESET_BYTES {
+        return Err(format!(
+            "Le preset dépasse la limite de 1 Mio : {} octets.",
+            content_bytes.len()
+        ));
+    }
+
+    let destination = PathBuf::from(destination_path);
+
+    let extension_is_json = destination
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("json"))
+        .unwrap_or(false);
+
+    if !extension_is_json {
+        return Err("Le fichier d'export doit porter l'extension .json.".to_string());
+    }
+
+    let parent = destination
+        .parent()
+        .ok_or_else(|| "Le dossier de destination est invalide.".to_string())?;
+
+    if !parent.is_dir() {
+        return Err(format!(
+            "Le dossier de destination n'existe pas : {}",
+            parent.display()
+        ));
+    }
+
+    let file_name = destination
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "Le nom du preset est invalide.".to_string())?;
+
+    let temporary = parent.join(format!(".{file_name}.exporting"));
+
+    fs::write(&temporary, content_bytes).map_err(|error| {
+        format!(
+            "Impossible d'écrire le preset temporaire {} : {error}",
+            temporary.display()
+        )
+    })?;
+
+    if destination.exists() {
+        fs::remove_file(&destination).map_err(|error| {
+            let _ = fs::remove_file(&temporary);
+
+            format!(
+                "Impossible de remplacer {} : {error}",
+                destination.display()
+            )
+        })?;
+    }
+
+    fs::rename(&temporary, &destination).map_err(|error| {
+        let _ = fs::remove_file(&temporary);
+
+        format!(
+            "Impossible de finaliser le preset {} : {error}",
+            destination.display()
+        )
+    })?;
+
+    Ok(content_bytes.len() as u64)
+}
+
+#[tauri::command]
 fn open_pipeline_file(
     app: tauri::AppHandle,
     state: tauri::State<'_, PipelineBackendState>,
@@ -890,6 +961,7 @@ pub fn run() {
             stop_pipeline_backend,
             upload_pipeline_file,
             read_pipeline_preset,
+            write_pipeline_preset,
             open_pipeline_file,
             export_pipeline_file,
         ])

@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   RotateCcw,
+  Download,
   Settings2,
   Upload,
 } from "lucide-react";
@@ -15,8 +16,13 @@ import type {
   PipelineSchema,
 } from "./api";
 import {
+  exportPipelinePresetFile,
   importPipelinePresetFile,
 } from "./pipelinePresetFileActions";
+import {
+  createExportedPreset,
+  presetFilename,
+} from "./pipelinePresetUtils";
 import "./PipelineConfigurationPanel.css";
 
 type ParameterValue = boolean | number | string;
@@ -220,6 +226,63 @@ export function PipelineConfigurationPanel({
     }
   }
 
+  const [presetExportPending, setPresetExportPending] =
+    useState(false);
+
+  const [presetActionMessage, setPresetActionMessage] =
+    useState<string | null>(null);
+
+  async function handleExportPreset() {
+    if (
+      presetExportPending ||
+      validating ||
+      !schema
+    ) {
+      return;
+    }
+
+    setPresetExportPending(true);
+    setPresetActionMessage(null);
+
+    try {
+      const validationResult = await onValidate();
+
+      if (!validationResult.valid) {
+        return;
+      }
+
+      const activePreset = presets.find(
+        (preset) =>
+          preset.id === activePresetId,
+      );
+
+      const presetName =
+        activePreset?.name ??
+        "Configuration personnalisée";
+
+      const presetDocument = createExportedPreset(
+        presetName,
+        activePreset?.description ?? "",
+        validationResult.configuration,
+        schema.version,
+      );
+
+      const destination =
+        await exportPipelinePresetFile(
+          presetDocument,
+          presetFilename(presetName),
+        );
+
+      if (destination) {
+        setPresetActionMessage(
+          `Preset exporté vers ${destination}`,
+        );
+      }
+    } finally {
+      setPresetExportPending(false);
+    }
+  }
+
   useEffect(() => {
     if (
       schema &&
@@ -328,6 +391,27 @@ export function PipelineConfigurationPanel({
               ? "Import en cours…"
               : "Importer un preset JSON"}
           </button>
+
+          <button
+            type="button"
+            className="pipeline-preset-import"
+            disabled={
+              presetExportPending ||
+              validating
+            }
+            onClick={() => void handleExportPreset()}
+          >
+            <Download size={14} />
+            {presetExportPending
+              ? "Export en cours…"
+              : "Exporter la configuration"}
+          </button>
+
+          {presetActionMessage && (
+            <small className="pipeline-preset-success">
+              {presetActionMessage}
+            </small>
+          )}
         </div>
 
         <nav aria-label="Sections de configuration">

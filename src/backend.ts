@@ -106,3 +106,16 @@ export async function readPipelinePreset(
     },
   );
 }
+
+export async function writePipelinePreset(
+  destinationPath: string,
+  content: string,
+): Promise<number> {
+  return invoke<number>(
+    "write_pipeline_preset",
+    {
+      destinationPath,
+      content,
+    },
+  );
+}

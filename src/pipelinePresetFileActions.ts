@@ -61,3 +61,36 @@ Promise<Record<string, unknown> | null> {
 
   return document as Record<string, unknown>;
 }
+
+import { save } from "@tauri-apps/plugin-dialog";
+import { writePipelinePreset } from "./backend";
+
+export async function exportPipelinePresetFile(
+  presetDocument: Record<string, unknown>,
+  suggestedFilename: string,
+): Promise<string | null> {
+  const destination = await save({
+    title: "Exporter le preset LASSO",
+    defaultPath: suggestedFilename,
+    filters: [
+      {
+        name: "Preset de configuration JSON",
+        extensions: ["json"],
+      },
+    ],
+  });
+
+  if (!destination) {
+    return null;
+  }
+
+  const content =
+    JSON.stringify(presetDocument, null, 2) + "\n";
+
+  await writePipelinePreset(
+    destination,
+    content,
+  );
+
+  return destination;
+}
