@@ -9,6 +9,7 @@ import {
   validatePipelineConfiguration,
   validatePipelinePreset,
   type ConfigurationValidationResult,
+  type NormalizedPipelineConfiguration,
   type PipelineConfiguration,
   type PipelinePreset,
   type PipelinePresetValidationResult,
@@ -217,6 +218,32 @@ export function usePipelineConfiguration(
     setValidation(null);
   }, [schema]);
 
+  const loadConfiguration = useCallback(
+    (
+      normalizedConfiguration:
+        NormalizedPipelineConfiguration,
+    ) => {
+      if (!schema) {
+        throw new Error(
+          "Le schéma de configuration n'est pas chargé.",
+        );
+      }
+
+      setConfiguration(
+        normalizedToEditableConfiguration(
+          normalizedConfiguration,
+          schema,
+        ),
+      );
+
+      setActivePresetId(null);
+      setValidation(null);
+      setPresetValidation(null);
+      setError(null);
+    },
+    [schema],
+  );
+
   const applyPreset = useCallback(
     (preset: PipelinePreset) => {
       if (!schema) {
@@ -326,6 +353,7 @@ export function usePipelineConfiguration(
     resetParameter,
     resetSection,
     resetAll,
+    loadConfiguration,
     applyPreset,
     importPreset,
     validate,

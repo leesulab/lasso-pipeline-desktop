@@ -15,11 +15,13 @@ import {
   Play,
   RefreshCw,
   Server,
+  Settings2,
   UploadCloud,
 } from "lucide-react";
 import {
   createPipelineJob,
   runPipelineJob,
+  type NormalizedPipelineConfiguration,
 } from "./api";
 import {
   monitorPipelineJob,
@@ -105,6 +107,25 @@ function StatusBadge({ status }: { status: JobStatus }) {
   );
 }
 
+function isNormalizedPipelineConfiguration(
+  value: unknown,
+): value is NormalizedPipelineConfiguration {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return false;
+  }
+
+  return Object.values(value).every(
+    (section) =>
+      section !== null &&
+      typeof section === "object" &&
+      !Array.isArray(section),
+  );
+}
+
 function ProgressBar({
   value,
   error = false,
@@ -152,6 +173,8 @@ function App() {
     resetParameter: resetPipelineConfigurationParameter,
     resetSection: resetPipelineConfigurationSection,
     resetAll: resetPipelineConfiguration,
+    loadConfiguration:
+      loadHistoricalPipelineConfiguration,
     applyPreset: applyPipelinePreset,
     importPreset: importPipelinePreset,
     validate: validateCurrentPipelineConfiguration,
@@ -451,6 +474,55 @@ function App() {
       await refreshPipelineData();
     } finally {
       setRestartingJobId(null);
+    }
+  }
+
+  function reuseJobConfiguration(
+    jobId: string,
+  ) {
+    const job = jobs.find(
+      (candidate) =>
+        candidate.source.jobId === jobId,
+    );
+
+    if (!job) {
+      setJobActionError(
+        "L'analyse sélectionnée est introuvable.",
+      );
+      return;
+    }
+
+    const rawConfiguration =
+      job.source.parameters[
+        "pipeline_configuration"
+      ];
+
+    if (
+      !isNormalizedPipelineConfiguration(
+        rawConfiguration,
+      )
+    ) {
+      setJobActionError(
+        "Cette analyse ne contient pas de " +
+          "configuration réutilisable.",
+      );
+      return;
+    }
+
+    try {
+      loadHistoricalPipelineConfiguration(
+        rawConfiguration,
+      );
+
+      setSelectedSteps([...job.source.steps]);
+      setProjectName(`Copie de ${job.name}`);
+      setSelectedFiles(emptySelectedFiles);
+      setFileSelectionError(null);
+      setJobActionError(null);
+      setUploadProgress(null);
+      setView("new");
+    } catch (error) {
+      setJobActionError(String(error));
     }
   }
 
@@ -1039,6 +1111,23 @@ function App() {
 
                       <div className="job-card-actions">
                         <StatusBadge status={job.status} />
+
+                        <button
+                          type="button"
+                          className="reuse-config-button"
+                          disabled={
+                            !engineStarted ||
+                            !pipelineConfigurationSchema
+                          }
+                          onClick={() =>
+                            reuseJobConfiguration(
+                              job.source.jobId,
+                            )
+                          }
+                        >
+                          <Settings2 size={14} />
+                          Réutiliser la configuration
+                        </button>
 
                         <button
                           type="button"

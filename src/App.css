@@ -845,3 +845,26 @@ button:disabled {
     justify-content: flex-start;
   }
 }
+
+.reuse-config-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #f0fdfa;
+  color: #115e59;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reuse-config-button:hover:not(:disabled) {
+  border-color: #14b8a6;
+  background: #ccfbf1;
+}
+
+.reuse-config-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
