@@ -151,6 +151,14 @@ function ProgressBar({
   );
 }
 
+function isParquetResult(
+  relativePath: string,
+): boolean {
+  return relativePath
+    .toLowerCase()
+    .endsWith(".parquet");
+}
+
 function App() {
   const [backendStatus, setBackendStatus] =
     useState<BackendStatus>(stoppedBackendStatus);
@@ -386,6 +394,23 @@ function App() {
     } catch (error) {
       setFileSelectionError(String(error));
     }
+  }
+
+  function showIntegratedTablePreview() {
+    window.dispatchEvent(
+      new Event("lasso:show-result-tables"),
+    );
+
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector(
+          ".scientific-results-panel",
+        )
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    });
   }
 
   async function handleOpenResultFile(
@@ -1425,16 +1450,42 @@ function App() {
                                     disabled={
                                       resultActionPending !== null
                                     }
-                                    onClick={() =>
-                                      void handleOpenResultFile(
+                                    title={
+                                      isParquetResult(
                                         file.relativePath,
                                       )
+                                        ? (
+                                            "Afficher ce fichier dans " +
+                                            "la prévisualisation tabulaire"
+                                          )
+                                        : (
+                                            "Ouvrir avec l’application " +
+                                            "système"
+                                          )
                                     }
+                                    onClick={() => {
+                                      if (
+                                        isParquetResult(
+                                          file.relativePath,
+                                        )
+                                      ) {
+                                        showIntegratedTablePreview();
+                                        return;
+                                      }
+
+                                      void handleOpenResultFile(
+                                        file.relativePath,
+                                      );
+                                    }}
                                   >
-                                    {resultActionPending ===
-                                    `open:${file.relativePath}`
-                                      ? "Ouverture…"
-                                      : "Ouvrir"}
+                                    {isParquetResult(
+                                      file.relativePath,
+                                    )
+                                      ? "Voir dans Tables"
+                                      : resultActionPending ===
+                                          `open:${file.relativePath}`
+                                        ? "Ouverture…"
+                                        : "Ouvrir"}
                                   </button>
 
                                   <button

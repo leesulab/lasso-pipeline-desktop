@@ -1,4 +1,8 @@
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   BarChart3,
   Database,
@@ -16,6 +20,9 @@ import {
 import {
   ScientificTextPreview,
 } from "./ScientificTextPreview";
+import {
+  ScientificTablePreview,
+} from "./ScientificTablePreview";
 import { formatFileSize } from "./usePipelineFiles";
 import "./ScientificResultsPanel.css";
 
@@ -109,16 +116,38 @@ function ResultCards({
             />
           )}
 
+          {result.kind === "table" && (
+            <ScientificTablePreview
+              backendStatus={backendStatus}
+              jobId={jobId}
+              result={result}
+            />
+          )}
+
           <div className="scientific-result-actions">
             <button
               type="button"
-              disabled={pendingAction !== null}
+              disabled={
+                pendingAction !== null ||
+                result.format === "parquet"
+              }
+              title={
+                result.format === "parquet"
+                  ? (
+                      "Utilisez la prévisualisation intégrée " +
+                      "ou exportez le fichier Parquet."
+                    )
+                  : "Ouvrir avec l’application système"
+              }
               onClick={() => void onOpen(result.relativePath)}
             >
               <ExternalLink size={14} />
-              {pendingAction === `open:${result.relativePath}`
-                ? "Ouverture…"
-                : "Ouvrir"}
+              {result.format === "parquet"
+                ? "Aperçu intégré"
+                : pendingAction ===
+                    `open:${result.relativePath}`
+                  ? "Ouverture…"
+                  : "Ouvrir"}
             </button>
 
             <button
@@ -149,6 +178,24 @@ export function ScientificResultsPanel({
   onExport,
 }: ScientificResultsPanelProps) {
   const [activeTab, setActiveTab] = useState<ResultTab>("summary");
+
+  useEffect(() => {
+    function showTables() {
+      setActiveTab("tables");
+    }
+
+    window.addEventListener(
+      "lasso:show-result-tables",
+      showTables,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "lasso:show-result-tables",
+        showTables,
+      );
+    };
+  }, []);
 
   const groups = useMemo(() => {
     const grouped = new Map<string, PipelineResultEntry[]>();

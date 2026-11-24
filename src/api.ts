@@ -563,3 +563,88 @@ export async function fetchPipelineResultBlob(
 
   return response.blob();
 }
+
+export type PipelineTableColumn = {
+  name: string;
+  type: string;
+};
+
+export type PipelineTableCell =
+  | boolean
+  | number
+  | string
+  | null;
+
+export type PipelineTablePreview = {
+  resultId: string;
+  format: string;
+  columns: PipelineTableColumn[];
+  rows: Array<Record<string, PipelineTableCell>>;
+  offset: number;
+  limit: number;
+  returned: number;
+  total: number;
+  hasMore: boolean;
+};
+
+type ApiPipelineTablePreview = {
+  result_id: string;
+  format: string;
+  columns: PipelineTableColumn[];
+  rows: Array<Record<string, PipelineTableCell>>;
+  offset: number;
+  limit: number;
+  returned: number;
+  total: number;
+  has_more: boolean;
+};
+
+export type PipelineTablePreviewOptions = {
+  offset?: number;
+  limit?: number;
+  columns?: string[];
+};
+
+export async function fetchPipelineTablePreview(
+  backend: BackendStatus,
+  jobId: string,
+  resultId: string,
+  options: PipelineTablePreviewOptions = {},
+): Promise<PipelineTablePreview> {
+  const offset = options.offset ?? 0;
+  const limit = options.limit ?? 50;
+
+  const query = new URLSearchParams({
+    offset: String(offset),
+    limit: String(limit),
+  });
+
+  if (options.columns?.length) {
+    query.set(
+      "columns",
+      options.columns.join(","),
+    );
+  }
+
+  const preview =
+    await apiRequest<ApiPipelineTablePreview>(
+      backend,
+      `/api/v1/jobs/${encodeURIComponent(
+        jobId,
+      )}/tables/${encodeURIComponent(
+        resultId,
+      )}/preview?${query.toString()}`,
+    );
+
+  return {
+    resultId: preview.result_id,
+    format: preview.format,
+    columns: preview.columns,
+    rows: preview.rows,
+    offset: preview.offset,
+    limit: preview.limit,
+    returned: preview.returned,
+    total: preview.total,
+    hasMore: preview.has_more,
+  };
+}

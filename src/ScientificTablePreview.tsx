@@ -1,0 +1,407 @@
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  fetchPipelineTablePreview,
+  type PipelineResultEntry,
+  type PipelineTablePreview,
+} from "./api";
+import type { BackendStatus } from "./backend";
+
+const PAGE_SIZE = 50;
+const DEFAULT_VISIBLE_COLUMNS = 8;
+
+type ScientificTablePreviewProps = {
+  backendStatus: BackendStatus;
+  jobId: string;
+  result: PipelineResultEntry;
+};
+
+function formatCell(
+  value: boolean | number | string | null,
+): string {
+  if (value === null) {
+    return "∅";
+  }
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      return String(value);
+    }
+
+    return new Intl.NumberFormat("fr-FR", {
+      maximumSignificantDigits: 8,
+    }).format(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Oui" : "Non";
+  }
+
+  return value;
+}
+
+export function ScientificTablePreview({
+  backendStatus,
+  jobId,
+  result,
+}: ScientificTablePreviewProps) {
+  const [preview, setPreview] =
+    useState<PipelineTablePreview | null>(null);
+
+  const [offset, setOffset] = useState(0);
+
+  const [selectedColumns, setSelectedColumns] =
+    useState<string[]>([]);
+
+  const [availableColumns, setAvailableColumns] =
+    useState<PipelineTablePreview["columns"]>([]);
+
+  const [columnSelectorOpen, setColumnSelectorOpen] =
+    useState(false);
+
+  const [loading, setLoading] = useState(false);
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    setOffset(0);
+    setSelectedColumns([]);
+    setAvailableColumns([]);
+    setPreview(null);
+    setError(null);
+  }, [jobId, result.id]);
+
+  useEffect(() => {
+    if (
+      !backendStatus.running ||
+      result.kind !== "table"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadPage() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const loadedPreview =
+          await fetchPipelineTablePreview(
+            backendStatus,
+            jobId,
+            result.id,
+            {
+              offset,
+              limit: PAGE_SIZE,
+              columns:
+                availableColumns.length > 0 &&
+                selectedColumns.length > 0
+                  ? selectedColumns
+                  : undefined,
+            },
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        setPreview(loadedPreview);
+
+        if (availableColumns.length === 0) {
+          setAvailableColumns(
+            loadedPreview.columns,
+          );
+        }
+
+        if (selectedColumns.length === 0) {
+          setSelectedColumns(
+            loadedPreview.columns
+              .slice(0, DEFAULT_VISIBLE_COLUMNS)
+              .map((column) => column.name),
+          );
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(String(loadError));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadPage();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    backendStatus,
+    jobId,
+    result.id,
+    result.kind,
+    offset,
+    selectedColumns,
+    availableColumns.length,
+  ]);
+
+  const pageNumber = Math.floor(
+    offset / PAGE_SIZE,
+  ) + 1;
+
+  const pageCount = preview
+    ? Math.max(
+        1,
+        Math.ceil(preview.total / PAGE_SIZE),
+      )
+    : 1;
+
+  const visibleColumnNames = useMemo(
+    () =>
+      preview?.columns.map(
+        (column) => column.name,
+      ) ?? [],
+    [preview],
+  );
+
+  function toggleColumn(columnName: string) {
+    setSelectedColumns((current) => {
+      if (current.includes(columnName)) {
+        if (current.length === 1) {
+          return current;
+        }
+
+        return current.filter(
+          (name) => name !== columnName,
+        );
+      }
+
+      return [...current, columnName];
+    });
+
+    setOffset(0);
+  }
+
+  if (error) {
+    return (
+      <div className="scientific-table-error">
+        Prévisualisation impossible : {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="scientific-table-preview">
+      <header className="scientific-table-toolbar">
+        <div>
+          <strong>
+            {preview
+              ? `${preview.total.toLocaleString(
+                  "fr-FR",
+                )} ligne(s)`
+              : "Chargement…"}
+          </strong>
+
+          {preview && (
+            <span>
+              Page {pageNumber} sur {pageCount}
+            </span>
+          )}
+        </div>
+
+        <div className="scientific-table-toolbar-actions">
+          <button
+            type="button"
+            onClick={() =>
+              setColumnSelectorOpen(
+                (current) => !current,
+              )
+            }
+          >
+            Colonnes
+          </button>
+
+          <button
+            type="button"
+            disabled={
+              loading ||
+              !preview ||
+              offset === 0
+            }
+            onClick={() =>
+              setOffset((current) =>
+                Math.max(0, current - PAGE_SIZE),
+              )
+            }
+          >
+            Précédent
+          </button>
+
+          <button
+            type="button"
+            disabled={
+              loading ||
+              !preview ||
+              !preview.hasMore
+            }
+            onClick={() =>
+              setOffset(
+                (current) =>
+                  current + PAGE_SIZE,
+              )
+            }
+          >
+            Suivant
+          </button>
+        </div>
+      </header>
+
+      {columnSelectorOpen && preview && (
+        <div className="scientific-column-selector">
+          <div className="scientific-column-selector-actions">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedColumns(
+                  availableColumns.map(
+                    (column) => column.name,
+                  ),
+                );
+                setOffset(0);
+              }}
+            >
+              Tout sélectionner
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedColumns(
+                  availableColumns
+                    .slice(
+                      0,
+                      DEFAULT_VISIBLE_COLUMNS,
+                    )
+                    .map(
+                      (column) => column.name,
+                    ),
+                );
+                setOffset(0);
+              }}
+            >
+              Sélection courte
+            </button>
+          </div>
+
+          <div className="scientific-column-options">
+            {availableColumns.map((column) => (
+              <label key={column.name}>
+                <input
+                  type="checkbox"
+                  checked={selectedColumns.includes(
+                    column.name,
+                  )}
+                  onChange={() =>
+                    toggleColumn(column.name)
+                  }
+                />
+
+                <span>
+                  <strong>{column.name}</strong>
+                  <small>{column.type}</small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {loading && !preview && (
+        <div className="scientific-results-empty">
+          Chargement de la table…
+        </div>
+      )}
+
+      {preview && (
+        <div className="scientific-table-scroll">
+          <table>
+            <thead>
+              <tr>
+                {visibleColumnNames.map(
+                  (columnName) => {
+                    const column =
+                      preview.columns.find(
+                        (item) =>
+                          item.name === columnName,
+                      );
+
+                    return (
+                      <th key={columnName}>
+                        <span>{columnName}</span>
+                        <small>
+                          {column?.type ?? ""}
+                        </small>
+                      </th>
+                    );
+                  },
+                )}
+              </tr>
+            </thead>
+
+            <tbody>
+              {preview.rows.map(
+                (row, rowIndex) => (
+                  <tr
+                    key={`${offset}-${rowIndex}`}
+                  >
+                    {visibleColumnNames.map(
+                      (columnName) => (
+                        <td key={columnName}>
+                          {formatCell(
+                            row[columnName] ??
+                              null,
+                          )}
+                        </td>
+                      ),
+                    )}
+                  </tr>
+                ),
+              )}
+            </tbody>
+          </table>
+
+          {preview.rows.length === 0 && (
+            <div className="scientific-results-empty">
+              Aucune ligne sur cette page.
+            </div>
+          )}
+
+          {loading && (
+            <div className="scientific-table-loading">
+              Actualisation…
+            </div>
+          )}
+        </div>
+      )}
+
+      {preview && (
+        <footer className="scientific-table-footer">
+          Lignes{" "}
+          {preview.returned > 0
+            ? preview.offset + 1
+            : 0}
+          –{preview.offset + preview.returned} sur{" "}
+          {preview.total.toLocaleString("fr-FR")}
+          {" · "}
+          maximum {PAGE_SIZE} lignes par page
+        </footer>
+      )}
+    </div>
+  );
+}
