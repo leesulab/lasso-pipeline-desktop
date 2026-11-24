@@ -446,3 +446,70 @@ export async function validatePipelinePreset(
     errors: result.errors,
   };
 }
+
+export type PipelineResultKind =
+  | "image"
+  | "html"
+  | "table"
+  | "text"
+  | "file";
+
+export type PipelineResultEntry = {
+  id: string;
+  title: string;
+  group: string;
+  kind: PipelineResultKind;
+  format: string;
+  relativePath: string;
+  sizeBytes: number;
+  order: number;
+};
+
+export type PipelineResultManifest = {
+  version: number;
+  jobId: string;
+  results: PipelineResultEntry[];
+};
+
+type ApiPipelineResultEntry = {
+  id: string;
+  title: string;
+  group: string;
+  kind: PipelineResultKind;
+  format: string;
+  relative_path: string;
+  size_bytes: number;
+  order: number;
+};
+
+type ApiPipelineResultManifest = {
+  version: number;
+  job_id: string;
+  results: ApiPipelineResultEntry[];
+};
+
+export async function fetchPipelineResultManifest(
+  backend: BackendStatus,
+  jobId: string,
+): Promise<PipelineResultManifest> {
+  const manifest =
+    await apiRequest<ApiPipelineResultManifest>(
+      backend,
+      `/api/v1/jobs/${encodeURIComponent(jobId)}/results`,
+    );
+
+  return {
+    version: manifest.version,
+    jobId: manifest.job_id,
+    results: manifest.results.map((result) => ({
+      id: result.id,
+      title: result.title,
+      group: result.group,
+      kind: result.kind,
+      format: result.format,
+      relativePath: result.relative_path,
+      sizeBytes: result.size_bytes,
+      order: result.order,
+    })),
+  };
+}
