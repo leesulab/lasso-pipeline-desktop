@@ -13,6 +13,9 @@ import type { BackendStatus } from "./backend";
 import {
   ScientificImagePreview,
 } from "./ScientificImagePreview";
+import {
+  ScientificTextPreview,
+} from "./ScientificTextPreview";
 import { formatFileSize } from "./usePipelineFiles";
 import "./ScientificResultsPanel.css";
 
@@ -92,6 +95,14 @@ function ResultCards({
 
           {result.kind === "image" && (
             <ScientificImagePreview
+              backendStatus={backendStatus}
+              jobId={jobId}
+              result={result}
+            />
+          )}
+
+          {result.kind === "text" && (
+            <ScientificTextPreview
               backendStatus={backendStatus}
               jobId={jobId}
               result={result}
