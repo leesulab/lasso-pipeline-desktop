@@ -53,6 +53,12 @@ export function ScientificTablePreview({
 
   const [offset, setOffset] = useState(0);
 
+  const [sortBy, setSortBy] =
+    useState<string | null>(null);
+
+  const [sortDirection, setSortDirection] =
+    useState<"asc" | "desc" | null>(null);
+
   const [selectedColumns, setSelectedColumns] =
     useState<string[]>([]);
 
@@ -69,6 +75,8 @@ export function ScientificTablePreview({
 
   useEffect(() => {
     setOffset(0);
+    setSortBy(null);
+    setSortDirection(null);
     setSelectedColumns([]);
     setAvailableColumns([]);
     setPreview(null);
@@ -103,6 +111,9 @@ export function ScientificTablePreview({
                 selectedColumns.length > 0
                   ? selectedColumns
                   : undefined,
+              sortBy: sortBy ?? undefined,
+              sortDirection:
+                sortDirection ?? undefined,
             },
           );
 
@@ -149,6 +160,8 @@ export function ScientificTablePreview({
     offset,
     selectedColumns,
     availableColumns.length,
+    sortBy,
+    sortDirection,
   ]);
 
   const pageNumber = Math.floor(
@@ -170,11 +183,46 @@ export function ScientificTablePreview({
     [preview],
   );
 
+  function cycleSort(columnName: string) {
+    setOffset(0);
+
+    if (sortBy !== columnName) {
+      setSortBy(columnName);
+      setSortDirection("asc");
+      return;
+    }
+
+    if (sortDirection === "asc") {
+      setSortDirection("desc");
+      return;
+    }
+
+    setSortBy(null);
+    setSortDirection(null);
+  }
+
+  function sortIndicator(
+    columnName: string,
+  ): string {
+    if (sortBy !== columnName) {
+      return "↕";
+    }
+
+    return sortDirection === "desc"
+      ? "↓"
+      : "↑";
+  }
+
   function toggleColumn(columnName: string) {
     setSelectedColumns((current) => {
       if (current.includes(columnName)) {
         if (current.length === 1) {
           return current;
+        }
+
+        if (sortBy === columnName) {
+          setSortBy(null);
+          setSortDirection(null);
         }
 
         return current.filter(
@@ -342,8 +390,46 @@ export function ScientificTablePreview({
                       );
 
                     return (
-                      <th key={columnName}>
-                        <span>{columnName}</span>
+                      <th
+                        key={columnName}
+                        aria-sort={
+                          sortBy !== columnName
+                            ? "none"
+                            : sortDirection === "desc"
+                              ? "descending"
+                              : "ascending"
+                        }
+                      >
+                        <button
+                          type="button"
+                          className={
+                            sortBy === columnName
+                              ? "scientific-table-sort is-active"
+                              : "scientific-table-sort"
+                          }
+                          title={
+                            sortBy !== columnName
+                              ? "Trier par ordre croissant"
+                              : sortDirection === "asc"
+                                ? "Trier par ordre décroissant"
+                                : "Supprimer le tri"
+                          }
+                          onClick={() =>
+                            cycleSort(columnName)
+                          }
+                        >
+                          <span>{columnName}</span>
+
+                          <strong
+                            aria-hidden="true"
+                            className="scientific-sort-indicator"
+                          >
+                            {sortIndicator(
+                              columnName,
+                            )}
+                          </strong>
+                        </button>
+
                         <small>
                           {column?.type ?? ""}
                         </small>

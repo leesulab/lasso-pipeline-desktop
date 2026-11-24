@@ -585,6 +585,8 @@ export type PipelineTablePreview = {
   returned: number;
   total: number;
   hasMore: boolean;
+  sortBy: string | null;
+  sortDirection: "asc" | "desc" | null;
 };
 
 type ApiPipelineTablePreview = {
@@ -597,12 +599,16 @@ type ApiPipelineTablePreview = {
   returned: number;
   total: number;
   has_more: boolean;
+  sort_by: string | null;
+  sort_direction: "asc" | "desc" | null;
 };
 
 export type PipelineTablePreviewOptions = {
   offset?: number;
   limit?: number;
   columns?: string[];
+  sortBy?: string;
+  sortDirection?: "asc" | "desc";
 };
 
 export async function fetchPipelineTablePreview(
@@ -626,6 +632,14 @@ export async function fetchPipelineTablePreview(
     );
   }
 
+  if (options.sortBy) {
+    query.set("sort_by", options.sortBy);
+    query.set(
+      "sort_direction",
+      options.sortDirection ?? "asc",
+    );
+  }
+
   const preview =
     await apiRequest<ApiPipelineTablePreview>(
       backend,
@@ -646,5 +660,7 @@ export async function fetchPipelineTablePreview(
     returned: preview.returned,
     total: preview.total,
     hasMore: preview.has_more,
+    sortBy: preview.sort_by,
+    sortDirection: preview.sort_direction,
   };
 }
