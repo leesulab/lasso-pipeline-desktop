@@ -42,6 +42,9 @@ import {
   usePipelineResults,
 } from "./usePipelineResults";
 import {
+  ScientificResultsPanel,
+} from "./ScientificResultsPanel";
+import {
   exportResultFile,
   openResultFile,
 } from "./resultFileActions";
@@ -232,7 +235,6 @@ function App() {
   const {
     manifest: selectedResultManifest,
     results: selectedScientificResults,
-    resultsByGroup: scientificResultsByGroup,
     visualizations: scientificVisualizations,
     tables: scientificTables,
     reports: scientificReports,
@@ -1289,9 +1291,26 @@ function App() {
                     </article>
                   )}
 
-                <div hidden>
-                  {Object.keys(scientificResultsByGroup).length}
-                </div>
+                {selectedResultManifest &&
+                  !scientificResultsLoading && (
+                    <ScientificResultsPanel
+                      results={selectedScientificResults}
+                      visualizations={
+                        scientificVisualizations
+                      }
+                      tables={scientificTables}
+                      reports={scientificReports}
+                      pendingAction={
+                        resultActionPending
+                      }
+                      onOpen={
+                        handleOpenResultFile
+                      }
+                      onExport={
+                        handleExportResultFile
+                      }
+                    />
+                  )}
 
                 {!selectedResultJobId && (
                   <article className="card empty-state">
