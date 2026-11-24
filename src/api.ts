@@ -513,3 +513,53 @@ export async function fetchPipelineResultManifest(
     })),
   };
 }
+
+function encodeRelativePath(
+  relativePath: string,
+): string {
+  return relativePath
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+}
+
+export async function fetchPipelineResultBlob(
+  backend: BackendStatus,
+  jobId: string,
+  relativePath: string,
+): Promise<Blob> {
+  const { baseUrl, token } = requireConnection(backend);
+
+  const encodedJobId = encodeURIComponent(jobId);
+  const encodedPath = encodeRelativePath(relativePath);
+
+  const response = await fetch(
+    `${baseUrl}/api/v1/jobs/${encodedJobId}/files/${encodedPath}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "image/png,image/jpeg,image/svg+xml,text/plain,text/html",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    let detail = `Erreur HTTP ${response.status}`;
+
+    try {
+      const payload = (await response.json()) as {
+        detail?: string;
+      };
+
+      if (payload.detail) {
+        detail = payload.detail;
+      }
+    } catch {
+      // La réponse d'erreur n'était pas au format JSON.
+    }
+
+    throw new Error(detail);
+  }
+
+  return response.blob();
+}

@@ -9,6 +9,10 @@ import {
   Table2,
 } from "lucide-react";
 import type { PipelineResultEntry } from "./api";
+import type { BackendStatus } from "./backend";
+import {
+  ScientificImagePreview,
+} from "./ScientificImagePreview";
 import { formatFileSize } from "./usePipelineFiles";
 import "./ScientificResultsPanel.css";
 
@@ -19,6 +23,8 @@ type ResultTab =
   | "reports";
 
 type ScientificResultsPanelProps = {
+  backendStatus: BackendStatus;
+  jobId: string;
   results: PipelineResultEntry[];
   visualizations: PipelineResultEntry[];
   tables: PipelineResultEntry[];
@@ -45,11 +51,15 @@ function ResultIcon({ result }: { result: PipelineResultEntry }) {
 }
 
 function ResultCards({
+  backendStatus,
+  jobId,
   results,
   pendingAction,
   onOpen,
   onExport,
 }: {
+  backendStatus: BackendStatus;
+  jobId: string;
   results: PipelineResultEntry[];
   pendingAction: string | null;
   onOpen: (relativePath: string) => Promise<void>;
@@ -80,6 +90,14 @@ function ResultCards({
             <code>{result.relativePath}</code>
           </div>
 
+          {result.kind === "image" && (
+            <ScientificImagePreview
+              backendStatus={backendStatus}
+              jobId={jobId}
+              result={result}
+            />
+          )}
+
           <div className="scientific-result-actions">
             <button
               type="button"
@@ -109,6 +127,8 @@ function ResultCards({
 }
 
 export function ScientificResultsPanel({
+  backendStatus,
+  jobId,
   results,
   visualizations,
   tables,
@@ -182,6 +202,8 @@ export function ScientificResultsPanel({
 
         {activeTab === "visualizations" && (
           <ResultCards
+            backendStatus={backendStatus}
+            jobId={jobId}
             results={visualizations}
             pendingAction={pendingAction}
             onOpen={onOpen}
@@ -191,6 +213,8 @@ export function ScientificResultsPanel({
 
         {activeTab === "tables" && (
           <ResultCards
+            backendStatus={backendStatus}
+            jobId={jobId}
             results={tables}
             pendingAction={pendingAction}
             onOpen={onOpen}
@@ -200,6 +224,8 @@ export function ScientificResultsPanel({
 
         {activeTab === "reports" && (
           <ResultCards
+            backendStatus={backendStatus}
+            jobId={jobId}
             results={reports}
             pendingAction={pendingAction}
             onOpen={onOpen}

@@ -1291,9 +1291,12 @@ function App() {
                     </article>
                   )}
 
-                {selectedResultManifest &&
+                {selectedResultJobId &&
+                  selectedResultManifest &&
                   !scientificResultsLoading && (
                     <ScientificResultsPanel
+                      backendStatus={backendStatus}
+                      jobId={selectedResultJobId}
                       results={selectedScientificResults}
                       visualizations={
                         scientificVisualizations
