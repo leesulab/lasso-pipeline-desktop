@@ -39,6 +39,9 @@ import {
   usePipelineFiles,
 } from "./usePipelineFiles";
 import {
+  usePipelineResults,
+} from "./usePipelineResults";
+import {
   exportResultFile,
   openResultFile,
 } from "./resultFileActions";
@@ -222,6 +225,21 @@ function App() {
     error: resultFilesError,
     refresh: refreshResultFiles,
   } = usePipelineFiles(
+    backendStatus,
+    selectedResultJobId,
+  );
+
+  const {
+    manifest: selectedResultManifest,
+    results: selectedScientificResults,
+    resultsByGroup: scientificResultsByGroup,
+    visualizations: scientificVisualizations,
+    tables: scientificTables,
+    reports: scientificReports,
+    loading: scientificResultsLoading,
+    error: scientificResultsError,
+    refresh: refreshScientificResults,
+  } = usePipelineResults(
     backendStatus,
     selectedResultJobId,
   );
@@ -1212,6 +1230,67 @@ function App() {
                       Actualiser
                     </button>
                   )}
+                </div>
+
+                {selectedResultJobId &&
+                  scientificResultsLoading && (
+                    <article className="card empty-state">
+                      Chargement du manifeste scientifique…
+                    </article>
+                  )}
+
+                {scientificResultsError && (
+                  <div className="backend-error-panel">
+                    <strong>
+                      Impossible de charger le manifeste des résultats
+                    </strong>
+                    <span>{scientificResultsError}</span>
+                  </div>
+                )}
+
+                {selectedResultManifest &&
+                  !scientificResultsLoading && (
+                    <article className="card result-manifest-summary">
+                      <div>
+                        <strong>
+                          {selectedScientificResults.length}
+                        </strong>
+                        <span>résultat(s) scientifique(s)</span>
+                      </div>
+
+                      <div>
+                        <strong>
+                          {scientificVisualizations.length}
+                        </strong>
+                        <span>visualisation(s)</span>
+                      </div>
+
+                      <div>
+                        <strong>{scientificTables.length}</strong>
+                        <span>table(s)</span>
+                      </div>
+
+                      <div>
+                        <strong>{scientificReports.length}</strong>
+                        <span>rapport(s)</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="refresh-data-button"
+                        disabled={scientificResultsLoading}
+                        onClick={() =>
+                          void refreshScientificResults()
+                        }
+                      >
+                        <RefreshCw size={14} />
+                        Actualiser le manifeste
+                      </button>
+                    </article>
+                  )}
+
+                <div hidden>
+                  {Object.keys(scientificResultsByGroup).length}
                 </div>
 
                 {!selectedResultJobId && (

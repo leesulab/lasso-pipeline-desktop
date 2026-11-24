@@ -868,3 +868,36 @@ button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+.result-manifest-summary {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(110px, 1fr))
+    auto;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+}
+
+.result-manifest-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.result-manifest-summary strong {
+  color: #0f766e;
+  font-size: 21px;
+}
+
+.result-manifest-summary span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .result-manifest-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
