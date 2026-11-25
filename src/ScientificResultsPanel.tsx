@@ -12,7 +12,10 @@ import {
   Image,
   Table2,
 } from "lucide-react";
-import type { PipelineResultEntry } from "./api";
+import type {
+  IdentificationResultSummary,
+  PipelineResultEntry,
+} from "./api";
 import type { BackendStatus } from "./backend";
 import {
   ScientificImagePreview,
@@ -23,6 +26,9 @@ import {
 import {
   ScientificTablePreview,
 } from "./ScientificTablePreview";
+import {
+  IdentificationSummaryPanel,
+} from "./IdentificationSummaryPanel";
 import { formatFileSize } from "./usePipelineFiles";
 import "./ScientificResultsPanel.css";
 
@@ -35,6 +41,12 @@ type ResultTab =
 type ScientificResultsPanelProps = {
   backendStatus: BackendStatus;
   jobId: string;
+  identificationSummary:
+    IdentificationResultSummary | null;
+  identificationSummaryLoading: boolean;
+  identificationSummaryUnavailable: boolean;
+  identificationSummaryError: string | null;
+  onRefreshIdentificationSummary: () => void;
   results: PipelineResultEntry[];
   visualizations: PipelineResultEntry[];
   tables: PipelineResultEntry[];
@@ -179,6 +191,11 @@ function ResultCards({
 export function ScientificResultsPanel({
   backendStatus,
   jobId,
+  identificationSummary,
+  identificationSummaryLoading,
+  identificationSummaryUnavailable,
+  identificationSummaryError,
+  onRefreshIdentificationSummary,
   results,
   visualizations,
   tables,
@@ -249,22 +266,79 @@ export function ScientificResultsPanel({
 
       <div className="scientific-results-content">
         {activeTab === "summary" && (
-          <div className="scientific-results-summary">
-            {groups.length === 0 ? (
+          <div className="scientific-summary-content">
+            {identificationSummaryLoading && (
               <div className="scientific-results-empty">
-                Aucun résultat scientifique n’a encore été produit.
+                Calcul de la synthèse scientifique…
               </div>
-            ) : (
-              groups.map(([group, groupResults]) => (
-                <div className="scientific-summary-group" key={group}>
-                  <div>
-                    <Database size={18} />
-                    <strong>{groupLabels[group] ?? group}</strong>
-                  </div>
-                  <span>{groupResults.length} résultat(s)</span>
-                </div>
-              ))
             )}
+
+            {identificationSummaryError && (
+              <div className="scientific-summary-error">
+                <div>
+                  <strong>
+                    Impossible de calculer la synthèse
+                  </strong>
+                  <span>
+                    {identificationSummaryError}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={
+                    onRefreshIdentificationSummary
+                  }
+                >
+                  Réessayer
+                </button>
+              </div>
+            )}
+
+            {identificationSummaryUnavailable &&
+              !identificationSummaryLoading && (
+                <div className="scientific-results-empty">
+                  La synthèse d’identification sera
+                  disponible après la production de
+                  features_complete.parquet.
+                </div>
+              )}
+
+            {identificationSummary &&
+              !identificationSummaryLoading && (
+                <IdentificationSummaryPanel
+                  summary={identificationSummary}
+                />
+              )}
+
+            <div className="scientific-results-summary">
+              {groups.length === 0 ? (
+                <div className="scientific-results-empty">
+                  Aucun résultat scientifique n’a encore
+                  été produit.
+                </div>
+              ) : (
+                groups.map(
+                  ([group, groupResults]) => (
+                    <div
+                      className="scientific-summary-group"
+                      key={group}
+                    >
+                      <div>
+                        <Database size={18} />
+                        <strong>
+                          {groupLabels[group] ?? group}
+                        </strong>
+                      </div>
+
+                      <span>
+                        {groupResults.length} résultat(s)
+                      </span>
+                    </div>
+                  ),
+                )
+              )}
+            </div>
           </div>
         )}
 

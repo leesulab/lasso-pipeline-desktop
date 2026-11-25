@@ -657,3 +657,48 @@
   width: 100%;
   min-width: 0;
 }
+
+.scientific-summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.scientific-summary-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #fecaca;
+  border-radius: 11px;
+  padding: 12px 14px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.scientific-summary-error > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.scientific-summary-error strong {
+  font-size: 13px;
+}
+
+.scientific-summary-error span {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.scientific-summary-error button {
+  flex: 0 0 auto;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  padding: 6px 9px;
+  background: #ffffff;
+  color: #991b1b;
+  font-size: 11px;
+  font-weight: 700;
+}

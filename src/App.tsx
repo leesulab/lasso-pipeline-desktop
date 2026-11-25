@@ -42,6 +42,9 @@ import {
   usePipelineResults,
 } from "./usePipelineResults";
 import {
+  useIdentificationResultSummary,
+} from "./useIdentificationResultSummary";
+import {
   ScientificResultsPanel,
 } from "./ScientificResultsPanel";
 import {
@@ -250,6 +253,17 @@ function App() {
     error: scientificResultsError,
     refresh: refreshScientificResults,
   } = usePipelineResults(
+    backendStatus,
+    selectedResultJobId,
+  );
+
+  const {
+    summary: identificationSummary,
+    loading: identificationSummaryLoading,
+    unavailable: identificationSummaryUnavailable,
+    error: identificationSummaryError,
+    refresh: refreshIdentificationSummary,
+  } = useIdentificationResultSummary(
     backendStatus,
     selectedResultJobId,
   );
@@ -1322,6 +1336,21 @@ function App() {
                     <ScientificResultsPanel
                       backendStatus={backendStatus}
                       jobId={selectedResultJobId}
+                      identificationSummary={
+                        identificationSummary
+                      }
+                      identificationSummaryLoading={
+                        identificationSummaryLoading
+                      }
+                      identificationSummaryUnavailable={
+                        identificationSummaryUnavailable
+                      }
+                      identificationSummaryError={
+                        identificationSummaryError
+                      }
+                      onRefreshIdentificationSummary={
+                        refreshIdentificationSummary
+                      }
                       results={selectedScientificResults}
                       visualizations={
                         scientificVisualizations

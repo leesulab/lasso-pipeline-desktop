@@ -693,3 +693,85 @@ export async function fetchPipelineTablePreview(
     filters: preview.filters,
   };
 }
+
+export type ConfidenceDistributionEntry = {
+  confidenceLevel: number;
+  rowCount: number;
+  featureCount: number;
+};
+
+export type IdentificationResultSummary = {
+  rowCount: number;
+  uniqueFeatureCount: number;
+  identifiedRowCount: number;
+  identificationRate: number;
+  identifiedFeatureCount: number;
+  featureIdentificationRate: number;
+  distinctMoleculeCount: number;
+  medianGlobalScore: number | null;
+  sampleCount: number;
+  confidenceDistribution:
+    ConfidenceDistributionEntry[];
+};
+
+type ApiConfidenceDistributionEntry = {
+  confidence_level: number;
+  row_count: number;
+  feature_count: number;
+};
+
+type ApiIdentificationResultSummary = {
+  row_count: number;
+  unique_feature_count: number;
+  identified_row_count: number;
+  identification_rate: number;
+  identified_feature_count: number;
+  feature_identification_rate: number;
+  distinct_molecule_count: number;
+  median_global_score: number | null;
+  sample_count: number;
+  confidence_distribution:
+    ApiConfidenceDistributionEntry[];
+};
+
+export async function fetchIdentificationResultSummary(
+  backend: BackendStatus,
+  jobId: string,
+): Promise<IdentificationResultSummary> {
+  const summary =
+    await apiRequest<ApiIdentificationResultSummary>(
+      backend,
+      `/api/v1/jobs/${encodeURIComponent(
+        jobId,
+      )}/results/summary`,
+    );
+
+  return {
+    rowCount: summary.row_count,
+    uniqueFeatureCount:
+      summary.unique_feature_count,
+    identifiedRowCount:
+      summary.identified_row_count,
+    identificationRate:
+      summary.identification_rate,
+    identifiedFeatureCount:
+      summary.identified_feature_count,
+    featureIdentificationRate:
+      summary.feature_identification_rate,
+    distinctMoleculeCount:
+      summary.distinct_molecule_count,
+    medianGlobalScore:
+      summary.median_global_score,
+    sampleCount: summary.sample_count,
+    confidenceDistribution:
+      summary.confidence_distribution.map(
+        (entry) => ({
+          confidenceLevel:
+            entry.confidence_level,
+          rowCount: entry.row_count,
+          featureCount:
+            entry.feature_count,
+        }),
+      ),
+  };
+}
