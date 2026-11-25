@@ -197,6 +197,74 @@ export function IdentificationSummaryPanel({
           </div>
         )}
       </article>
+
+      <article className="sample-summary">
+        <header>
+          <div>
+            <h4>Indicateurs par échantillon</h4>
+            <p>
+              Features uniques, identifications et score
+              médian pour chaque échantillon.
+            </p>
+          </div>
+        </header>
+
+        {summary.sampleStatistics.length === 0 ? (
+          <div className="scientific-results-empty">
+            Aucune statistique par échantillon.
+          </div>
+        ) : (
+          <div className="sample-summary-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Échantillon</th>
+                  <th>Features</th>
+                  <th>Identifiées</th>
+                  <th>Taux</th>
+                  <th>Candidats</th>
+                  <th>Score médian</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {summary.sampleStatistics.map(
+                  (sample) => (
+                    <tr key={sample.sampleName}>
+                      <td>{sample.sampleName}</td>
+                      <td>
+                        {formatInteger(
+                          sample.uniqueFeatureCount,
+                        )}
+                      </td>
+                      <td>
+                        {formatInteger(
+                          sample.identifiedFeatureCount,
+                        )}
+                      </td>
+                      <td>
+                        {formatPercent(
+                          sample.featureIdentificationRate,
+                        )}
+                      </td>
+                      <td>
+                        {formatInteger(
+                          sample.identifiedRowCount,
+                        )}
+                      </td>
+                      <td>
+                        {formatScore(
+                          sample.medianGlobalScore,
+                        )}
+                      </td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
     </div>
   );
 }

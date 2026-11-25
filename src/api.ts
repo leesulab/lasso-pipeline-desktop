@@ -700,6 +700,15 @@ export type ConfidenceDistributionEntry = {
   featureCount: number;
 };
 
+export type SampleIdentificationStatistics = {
+  sampleName: string;
+  uniqueFeatureCount: number;
+  identifiedFeatureCount: number;
+  featureIdentificationRate: number;
+  identifiedRowCount: number;
+  medianGlobalScore: number | null;
+};
+
 export type IdentificationResultSummary = {
   rowCount: number;
   uniqueFeatureCount: number;
@@ -710,6 +719,8 @@ export type IdentificationResultSummary = {
   distinctMoleculeCount: number;
   medianGlobalScore: number | null;
   sampleCount: number;
+  sampleStatistics:
+    SampleIdentificationStatistics[];
   confidenceDistribution:
     ConfidenceDistributionEntry[];
 };
@@ -718,6 +729,15 @@ type ApiConfidenceDistributionEntry = {
   confidence_level: number;
   row_count: number;
   feature_count: number;
+};
+
+type ApiSampleIdentificationStatistics = {
+  sample_name: string;
+  unique_feature_count: number;
+  identified_feature_count: number;
+  feature_identification_rate: number;
+  identified_row_count: number;
+  median_global_score: number | null;
 };
 
 type ApiIdentificationResultSummary = {
@@ -730,6 +750,8 @@ type ApiIdentificationResultSummary = {
   distinct_molecule_count: number;
   median_global_score: number | null;
   sample_count: number;
+  sample_statistics:
+    ApiSampleIdentificationStatistics[];
   confidence_distribution:
     ApiConfidenceDistributionEntry[];
 };
@@ -763,6 +785,22 @@ export async function fetchIdentificationResultSummary(
     medianGlobalScore:
       summary.median_global_score,
     sampleCount: summary.sample_count,
+    sampleStatistics:
+      summary.sample_statistics.map(
+        (sample) => ({
+          sampleName: sample.sample_name,
+          uniqueFeatureCount:
+            sample.unique_feature_count,
+          identifiedFeatureCount:
+            sample.identified_feature_count,
+          featureIdentificationRate:
+            sample.feature_identification_rate,
+          identifiedRowCount:
+            sample.identified_row_count,
+          medianGlobalScore:
+            sample.median_global_score,
+        }),
+      ),
     confidenceDistribution:
       summary.confidence_distribution.map(
         (entry) => ({
