@@ -585,7 +585,9 @@ export type PipelineTableFilterOperator =
   | "contains"
   | "starts_with"
   | "is_null"
-  | "not_null";
+  | "not_null"
+  | "is_empty"
+  | "not_empty";
 
 export type PipelineTableFilter = {
   column: string;

@@ -12,6 +12,16 @@ import {
 import {
   ScientificTableFilters,
 } from "./ScientificTableFilters";
+import {
+  ScientificTableViews,
+} from "./ScientificTableViews";
+import {
+  createUserTableView,
+  loadUserTableViews,
+  saveUserTableViews,
+  tableViewsForResult,
+  type SavedTableView,
+} from "./tableViews";
 import type { BackendStatus } from "./backend";
 
 const PAGE_SIZE = 50;
@@ -77,6 +87,17 @@ export function ScientificTablePreview({
   const [filterEditorOpen, setFilterEditorOpen] =
     useState(false);
 
+  const [viewEditorOpen, setViewEditorOpen] =
+    useState(false);
+
+  const [viewName, setViewName] =
+    useState("");
+
+  const [userViews, setUserViews] =
+    useState<SavedTableView[]>(
+      () => loadUserTableViews(),
+    );
+
   const [appliedFilters, setAppliedFilters] =
     useState<PipelineTableFilter[]>([]);
 
@@ -87,16 +108,6 @@ export function ScientificTablePreview({
 
   const [error, setError] =
     useState<string | null>(null);
-
-  useEffect(() => {
-    setAppliedFilters(
-      requestedFilters,
-    );
-    setOffset(0);
-    setFilterEditorOpen(
-      requestedFilters.length > 0,
-    );
-  }, [requestedFilters]);
 
   useEffect(() => {
     const filters = JSON.parse(
@@ -206,6 +217,15 @@ export function ScientificTablePreview({
     appliedFilters,
   ]);
 
+  const availableViews = useMemo(
+    () =>
+      tableViewsForResult(
+        result.id,
+        userViews,
+      ),
+    [result.id, userViews],
+  );
+
   const pageNumber = Math.floor(
     offset / PAGE_SIZE,
   ) + 1;
@@ -224,6 +244,91 @@ export function ScientificTablePreview({
       ) ?? [],
     [preview],
   );
+
+  function applySavedView(
+    view: SavedTableView,
+  ) {
+    const validColumnNames = new Set(
+      availableColumns.map(
+        (column) => column.name,
+      ),
+    );
+
+    const validColumns = view.columns.filter(
+      (column) =>
+        validColumnNames.has(column),
+    );
+
+    const validFilters = view.filters.filter(
+      (filter) =>
+        validColumnNames.has(filter.column),
+    );
+
+    const validSortBy =
+      view.sortBy &&
+      validColumnNames.has(view.sortBy)
+        ? view.sortBy
+        : null;
+
+    setSelectedColumns(
+      validColumns.length > 0
+        ? validColumns
+        : availableColumns
+            .slice(0, DEFAULT_VISIBLE_COLUMNS)
+            .map((column) => column.name),
+    );
+
+    setAppliedFilters(validFilters);
+    setSortBy(validSortBy);
+    setSortDirection(
+      validSortBy
+        ? view.sortDirection ?? "asc"
+        : null,
+    );
+
+    setOffset(0);
+    setFilterEditorOpen(
+      validFilters.length > 0,
+    );
+    setColumnSelectorOpen(false);
+    setViewEditorOpen(false);
+    setError(null);
+  }
+
+  function saveCurrentView() {
+    try {
+      const view = createUserTableView(
+        viewName,
+        result.id,
+        selectedColumns,
+        appliedFilters,
+        sortBy,
+        sortDirection,
+        PAGE_SIZE,
+      );
+
+      const updatedViews = [
+        ...userViews,
+        view,
+      ];
+
+      saveUserTableViews(updatedViews);
+      setUserViews(updatedViews);
+      setViewName("");
+      setError(null);
+    } catch (saveError) {
+      setError(String(saveError));
+    }
+  }
+
+  function deleteSavedView(viewId: string) {
+    const updatedViews = userViews.filter(
+      (view) => view.id !== viewId,
+    );
+
+    saveUserTableViews(updatedViews);
+    setUserViews(updatedViews);
+  }
 
   function cycleSort(columnName: string) {
     setOffset(0);
@@ -309,6 +414,28 @@ export function ScientificTablePreview({
           <button
             type="button"
             className={
+              viewEditorOpen
+                ? "is-active"
+                : ""
+            }
+            disabled={availableColumns.length === 0}
+            onClick={() =>
+              setViewEditorOpen(
+                (current) => !current,
+              )
+            }
+          >
+            Vues
+            {availableViews.length > 0 && (
+              <span className="scientific-filter-count">
+                {availableViews.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className={
               appliedFilters.length > 0
                 ? "is-active"
                 : ""
@@ -372,6 +499,19 @@ export function ScientificTablePreview({
           </button>
         </div>
       </header>
+
+      {viewEditorOpen &&
+        availableColumns.length > 0 && (
+          <ScientificTableViews
+            views={availableViews}
+            viewName={viewName}
+            disabled={loading}
+            onViewNameChange={setViewName}
+            onApply={applySavedView}
+            onSave={saveCurrentView}
+            onDelete={deleteSavedView}
+          />
+        )}
 
       {filterEditorOpen &&
         availableColumns.length > 0 && (

@@ -83,7 +83,7 @@ export function IdentificationSummaryPanel({
       filters: [
         {
           column: "match_name",
-          operator: "not_null" as const,
+          operator: "not_empty" as const,
         },
       ],
     },
@@ -99,7 +99,7 @@ export function IdentificationSummaryPanel({
       filters: [
         {
           column: "match_name",
-          operator: "not_null" as const,
+          operator: "not_empty" as const,
         },
       ],
     },
@@ -113,7 +113,7 @@ export function IdentificationSummaryPanel({
       filters: [
         {
           column: "match_name",
-          operator: "not_null" as const,
+          operator: "not_empty" as const,
         },
       ],
     },

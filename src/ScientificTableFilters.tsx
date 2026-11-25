@@ -36,8 +36,10 @@ Record<PipelineTableFilterOperator, string> = {
   gte: "supérieur ou égal à",
   contains: "contient",
   starts_with: "commence par",
-  is_null: "est vide",
-  not_null: "n’est pas vide",
+  is_null: "est nul",
+  not_null: "n’est pas nul",
+  is_empty: "est vide ou nul",
+  not_empty: "est renseigné",
 };
 
 const numericOperators:
@@ -60,6 +62,8 @@ PipelineTableFilterOperator[] = [
   "ne",
   "is_null",
   "not_null",
+  "is_empty",
+  "not_empty",
 ];
 
 function isNumericColumn(
@@ -79,7 +83,9 @@ function operatorNeedsValue(
 ): boolean {
   return (
     operator !== "is_null" &&
-    operator !== "not_null"
+    operator !== "not_null" &&
+    operator !== "is_empty" &&
+    operator !== "not_empty"
   );
 }
 
