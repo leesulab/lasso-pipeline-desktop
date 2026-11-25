@@ -21,6 +21,7 @@ type ScientificTablePreviewProps = {
   backendStatus: BackendStatus;
   jobId: string;
   result: PipelineResultEntry;
+  requestedFilters: PipelineTableFilter[];
 };
 
 function formatCell(
@@ -51,6 +52,7 @@ export function ScientificTablePreview({
   backendStatus,
   jobId,
   result,
+  requestedFilters,
 }: ScientificTablePreviewProps) {
   const [preview, setPreview] =
     useState<PipelineTablePreview | null>(null);
@@ -78,17 +80,40 @@ export function ScientificTablePreview({
   const [appliedFilters, setAppliedFilters] =
     useState<PipelineTableFilter[]>([]);
 
+  const requestedFiltersKey =
+    JSON.stringify(requestedFilters);
+
   const [loading, setLoading] = useState(false);
 
   const [error, setError] =
     useState<string | null>(null);
 
   useEffect(() => {
+    setAppliedFilters(
+      requestedFilters,
+    );
+    setOffset(0);
+    setFilterEditorOpen(
+      requestedFilters.length > 0,
+    );
+  }, [requestedFilters]);
+
+  useEffect(() => {
+    const filters = JSON.parse(
+      requestedFiltersKey,
+    ) as PipelineTableFilter[];
+
+    setAppliedFilters(filters);
+    setOffset(0);
+    setFilterEditorOpen(
+      filters.length > 0,
+    );
+  }, [requestedFiltersKey]);
+
+  useEffect(() => {
     setOffset(0);
     setSortBy(null);
     setSortDirection(null);
-    setAppliedFilters([]);
-    setFilterEditorOpen(false);
     setSelectedColumns([]);
     setAvailableColumns([]);
     setPreview(null);

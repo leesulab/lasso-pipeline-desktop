@@ -210,3 +210,42 @@
 .sample-summary tbody tr:nth-child(even) {
   background: #f8fafc;
 }
+
+.identification-metric {
+  appearance: none;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.identification-metric:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.identification-metric.is-clickable {
+  cursor: pointer;
+}
+
+.identification-metric.is-clickable:hover {
+  border-color: #14b8a6;
+  background: #f0fdfa;
+  box-shadow: 0 6px 18px rgb(15 118 110 / 10%);
+}
+
+.confidence-row {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.confidence-row:hover {
+  border-radius: 7px;
+  background: #f0fdfa;
+}

@@ -15,6 +15,7 @@ import {
 import type {
   IdentificationResultSummary,
   PipelineResultEntry,
+  PipelineTableFilter,
 } from "./api";
 import type { BackendStatus } from "./backend";
 import {
@@ -76,6 +77,7 @@ function ResultCards({
   backendStatus,
   jobId,
   results,
+  requestedFeatureFilters,
   pendingAction,
   onOpen,
   onExport,
@@ -83,6 +85,8 @@ function ResultCards({
   backendStatus: BackendStatus;
   jobId: string;
   results: PipelineResultEntry[];
+  requestedFeatureFilters:
+    PipelineTableFilter[];
   pendingAction: string | null;
   onOpen: (relativePath: string) => Promise<void>;
   onExport: (relativePath: string) => Promise<void>;
@@ -143,6 +147,11 @@ function ResultCards({
               backendStatus={backendStatus}
               jobId={jobId}
               result={result}
+                          requestedFilters={
+                result.id === "identified-features"
+                  ? requestedFeatureFilters
+                  : []
+              }
             />
           )}
 
@@ -205,6 +214,11 @@ export function ScientificResultsPanel({
   onExport,
 }: ScientificResultsPanelProps) {
   const [activeTab, setActiveTab] = useState<ResultTab>("summary");
+
+  const [
+    requestedFeatureFilters,
+    setRequestedFeatureFilters,
+  ] = useState<PipelineTableFilter[]>([]);
 
   useEffect(() => {
     function showTables() {
@@ -308,6 +322,14 @@ export function ScientificResultsPanel({
               !identificationSummaryLoading && (
                 <IdentificationSummaryPanel
                   summary={identificationSummary}
+                  onShowFilteredFeatures={(
+                    filters,
+                  ) => {
+                    setRequestedFeatureFilters(
+                      filters,
+                    );
+                    setActiveTab("tables");
+                  }}
                 />
               )}
 
@@ -347,6 +369,7 @@ export function ScientificResultsPanel({
             backendStatus={backendStatus}
             jobId={jobId}
             results={visualizations}
+            requestedFeatureFilters={[]}
             pendingAction={pendingAction}
             onOpen={onOpen}
             onExport={onExport}
@@ -358,6 +381,9 @@ export function ScientificResultsPanel({
             backendStatus={backendStatus}
             jobId={jobId}
             results={tables}
+            requestedFeatureFilters={
+              requestedFeatureFilters
+            }
             pendingAction={pendingAction}
             onOpen={onOpen}
             onExport={onExport}
@@ -369,6 +395,7 @@ export function ScientificResultsPanel({
             backendStatus={backendStatus}
             jobId={jobId}
             results={reports}
+            requestedFeatureFilters={[]}
             pendingAction={pendingAction}
             onOpen={onOpen}
             onExport={onExport}

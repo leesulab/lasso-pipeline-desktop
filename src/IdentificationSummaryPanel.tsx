@@ -8,11 +8,15 @@ import {
 } from "lucide-react";
 import type {
   IdentificationResultSummary,
+  PipelineTableFilter,
 } from "./api";
 import "./IdentificationSummaryPanel.css";
 
 type IdentificationSummaryPanelProps = {
   summary: IdentificationResultSummary;
+  onShowFilteredFeatures: (
+    filters: PipelineTableFilter[],
+  ) => void;
 };
 
 function formatInteger(
@@ -46,8 +50,15 @@ function formatScore(
 
 export function IdentificationSummaryPanel({
   summary,
+  onShowFilteredFeatures,
 }: IdentificationSummaryPanelProps) {
-  const metrics = [
+  const metrics: Array<{
+    label: string;
+    value: string;
+    detail: string;
+    icon: typeof Layers3;
+    filters: PipelineTableFilter[];
+  }> = [
     {
       label: "Features uniques",
       value: formatInteger(
@@ -58,6 +69,7 @@ export function IdentificationSummaryPanel({
         "lignes candidates"
       ),
       icon: Layers3,
+      filters: [],
     },
     {
       label: "Features identifiées",
@@ -68,6 +80,12 @@ export function IdentificationSummaryPanel({
         summary.featureIdentificationRate,
       ),
       icon: Target,
+      filters: [
+        {
+          column: "match_name",
+          operator: "not_null" as const,
+        },
+      ],
     },
     {
       label: "Candidats identifiés",
@@ -78,6 +96,12 @@ export function IdentificationSummaryPanel({
         summary.identificationRate,
       ),
       icon: Microscope,
+      filters: [
+        {
+          column: "match_name",
+          operator: "not_null" as const,
+        },
+      ],
     },
     {
       label: "Molécules distinctes",
@@ -86,6 +110,12 @@ export function IdentificationSummaryPanel({
       ),
       detail: "Noms de correspondance uniques",
       icon: FlaskConical,
+      filters: [
+        {
+          column: "match_name",
+          operator: "not_null" as const,
+        },
+      ],
     },
     {
       label: "Score global médian",
@@ -94,6 +124,12 @@ export function IdentificationSummaryPanel({
       ),
       detail: "Sur les scores renseignés",
       icon: Gauge,
+      filters: [
+        {
+          column: "global_score",
+          operator: "not_null" as const,
+        },
+      ],
     },
     {
       label: "Échantillons",
@@ -102,6 +138,7 @@ export function IdentificationSummaryPanel({
       ),
       detail: "Déduits de la colonne samples",
       icon: Database,
+      filters: [],
     },
   ];
 
@@ -120,9 +157,33 @@ export function IdentificationSummaryPanel({
           const Icon = metric.icon;
 
           return (
-            <article
-              className="identification-metric"
+            <button
+              type="button"
+              className={
+                metric.filters.length > 0
+                  ? (
+                      "identification-metric " +
+                      "is-clickable"
+                    )
+                  : "identification-metric"
+              }
               key={metric.label}
+              disabled={metric.filters.length === 0}
+              title={
+                metric.filters.length > 0
+                  ? (
+                      "Afficher les lignes correspondantes " +
+                      "dans la table complète"
+                    )
+                  : undefined
+              }
+              onClick={() => {
+                if (metric.filters.length > 0) {
+                  onShowFilteredFeatures(
+                    metric.filters,
+                  );
+                }
+              }}
             >
               <div className="identification-metric-icon">
                 <Icon size={19} />
@@ -131,7 +192,7 @@ export function IdentificationSummaryPanel({
               <span>{metric.label}</span>
               <strong>{metric.value}</strong>
               <small>{metric.detail}</small>
-            </article>
+            </button>
           );
         })}
       </div>
@@ -156,9 +217,24 @@ export function IdentificationSummaryPanel({
           <div className="confidence-bars">
             {summary.confidenceDistribution.map(
               (entry) => (
-                <div
+                <button
+                  type="button"
                   className="confidence-row"
                   key={entry.confidenceLevel}
+                  title={
+                    "Afficher uniquement les résultats " +
+                    `de niveau ${entry.confidenceLevel}`
+                  }
+                  onClick={() =>
+                    onShowFilteredFeatures([
+                      {
+                        column: "confidence_level",
+                        operator: "eq",
+                        value:
+                          entry.confidenceLevel,
+                      },
+                    ])
+                  }
                 >
                   <span>
                     Niveau {entry.confidenceLevel}
@@ -191,7 +267,7 @@ export function IdentificationSummaryPanel({
                     )}{" "}
                     candidat(s)
                   </small>
-                </div>
+                </button>
               ),
             )}
           </div>
