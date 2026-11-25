@@ -6,8 +6,12 @@ import {
 import {
   fetchPipelineTablePreview,
   type PipelineResultEntry,
+  type PipelineTableFilter,
   type PipelineTablePreview,
 } from "./api";
+import {
+  ScientificTableFilters,
+} from "./ScientificTableFilters";
 import type { BackendStatus } from "./backend";
 
 const PAGE_SIZE = 50;
@@ -68,6 +72,12 @@ export function ScientificTablePreview({
   const [columnSelectorOpen, setColumnSelectorOpen] =
     useState(false);
 
+  const [filterEditorOpen, setFilterEditorOpen] =
+    useState(false);
+
+  const [appliedFilters, setAppliedFilters] =
+    useState<PipelineTableFilter[]>([]);
+
   const [loading, setLoading] = useState(false);
 
   const [error, setError] =
@@ -77,6 +87,8 @@ export function ScientificTablePreview({
     setOffset(0);
     setSortBy(null);
     setSortDirection(null);
+    setAppliedFilters([]);
+    setFilterEditorOpen(false);
     setSelectedColumns([]);
     setAvailableColumns([]);
     setPreview(null);
@@ -114,6 +126,10 @@ export function ScientificTablePreview({
               sortBy: sortBy ?? undefined,
               sortDirection:
                 sortDirection ?? undefined,
+              filters:
+                appliedFilters.length > 0
+                  ? appliedFilters
+                  : undefined,
             },
           );
 
@@ -162,6 +178,7 @@ export function ScientificTablePreview({
     availableColumns.length,
     sortBy,
     sortDirection,
+    appliedFilters,
   ]);
 
   const pageNumber = Math.floor(
@@ -266,6 +283,27 @@ export function ScientificTablePreview({
         <div className="scientific-table-toolbar-actions">
           <button
             type="button"
+            className={
+              appliedFilters.length > 0
+                ? "is-active"
+                : ""
+            }
+            onClick={() =>
+              setFilterEditorOpen(
+                (current) => !current,
+              )
+            }
+          >
+            Filtres
+            {appliedFilters.length > 0 && (
+              <span className="scientific-filter-count">
+                {appliedFilters.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() =>
               setColumnSelectorOpen(
                 (current) => !current,
@@ -309,6 +347,19 @@ export function ScientificTablePreview({
           </button>
         </div>
       </header>
+
+      {filterEditorOpen &&
+        availableColumns.length > 0 && (
+          <ScientificTableFilters
+            columns={availableColumns}
+            appliedFilters={appliedFilters}
+            disabled={loading}
+            onApply={(filters) => {
+              setAppliedFilters(filters);
+              setOffset(0);
+            }}
+          />
+        )}
 
       {columnSelectorOpen && preview && (
         <div className="scientific-column-selector">

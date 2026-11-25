@@ -83,8 +83,18 @@ function ResultCards({
     );
   }
 
+  const containsOnlyTables = results.every(
+    (result) => result.kind === "table",
+  );
+
   return (
-    <div className="scientific-result-grid">
+    <div
+      className={
+        containsOnlyTables
+          ? "scientific-result-grid scientific-result-grid-tables"
+          : "scientific-result-grid"
+      }
+    >
       {results.map((result) => (
         <article className="scientific-result-card" key={result.id}>
           <div className="scientific-result-icon">

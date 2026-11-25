@@ -575,6 +575,24 @@ export type PipelineTableCell =
   | string
   | null;
 
+export type PipelineTableFilterOperator =
+  | "eq"
+  | "ne"
+  | "lt"
+  | "lte"
+  | "gt"
+  | "gte"
+  | "contains"
+  | "starts_with"
+  | "is_null"
+  | "not_null";
+
+export type PipelineTableFilter = {
+  column: string;
+  operator: PipelineTableFilterOperator;
+  value?: boolean | number | string | null;
+};
+
 export type PipelineTablePreview = {
   resultId: string;
   format: string;
@@ -587,6 +605,7 @@ export type PipelineTablePreview = {
   hasMore: boolean;
   sortBy: string | null;
   sortDirection: "asc" | "desc" | null;
+  filters: PipelineTableFilter[];
 };
 
 type ApiPipelineTablePreview = {
@@ -601,6 +620,7 @@ type ApiPipelineTablePreview = {
   has_more: boolean;
   sort_by: string | null;
   sort_direction: "asc" | "desc" | null;
+  filters: PipelineTableFilter[];
 };
 
 export type PipelineTablePreviewOptions = {
@@ -609,6 +629,7 @@ export type PipelineTablePreviewOptions = {
   columns?: string[];
   sortBy?: string;
   sortDirection?: "asc" | "desc";
+  filters?: PipelineTableFilter[];
 };
 
 export async function fetchPipelineTablePreview(
@@ -640,6 +661,13 @@ export async function fetchPipelineTablePreview(
     );
   }
 
+  if (options.filters?.length) {
+    query.set(
+      "filters",
+      JSON.stringify(options.filters),
+    );
+  }
+
   const preview =
     await apiRequest<ApiPipelineTablePreview>(
       backend,
@@ -662,5 +690,6 @@ export async function fetchPipelineTablePreview(
     hasMore: preview.has_more,
     sortBy: preview.sort_by,
     sortDirection: preview.sort_direction,
+    filters: preview.filters,
   };
 }
