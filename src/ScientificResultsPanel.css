@@ -832,3 +832,133 @@
     flex-direction: column;
   }
 }
+
+.scientific-table-views {
+  padding: 12px;
+  border-bottom: 1px solid #99f6e4;
+  background: #f0fdfa;
+}
+
+.scientific-table-view-list {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.scientific-table-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #ccfbf1;
+  border-radius: 9px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.scientific-table-view > div:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scientific-table-view strong {
+  color: #134e4a;
+  font-size: 12px;
+}
+
+.scientific-table-view span,
+.scientific-table-view small {
+  color: #64748b;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.scientific-table-view-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.scientific-table-view-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #99f6e4;
+  border-radius: 7px;
+  padding: 6px 8px;
+  background: #f0fdfa;
+  color: #115e59;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.scientific-table-view-actions
+.scientific-table-view-delete {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.scientific-table-view-save {
+  margin-top: 12px;
+  border-top: 1px solid #99f6e4;
+  padding-top: 11px;
+}
+
+.scientific-table-view-save > label {
+  display: block;
+  margin-bottom: 6px;
+  color: #115e59;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.scientific-table-view-save > div {
+  display: flex;
+  gap: 7px;
+}
+
+.scientific-table-view-save input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #99f6e4;
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 11px;
+}
+
+.scientific-table-view-save button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #0f766e;
+  border-radius: 7px;
+  padding: 7px 10px;
+  background: #0f766e;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scientific-table-view-save small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 9px;
+}
+
+@media (max-width: 850px) {
+  .scientific-table-view-list {
+    grid-template-columns: 1fr;
+  }
+
+  .scientific-table-view-save > div {
+    flex-direction: column;
+  }
+}
