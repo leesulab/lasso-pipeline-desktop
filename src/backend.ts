@@ -119,3 +119,32 @@ export async function writePipelinePreset(
     },
   );
 }
+
+export type ExportPipelineTableViewOptions = {
+  jobId: string;
+  resultId: string;
+  columns: string[];
+  filters: Array<Record<string, unknown>>;
+  sortBy: string | null;
+  sortDirection: "asc" | "desc" | null;
+  filename: string;
+  destinationPath: string;
+};
+
+export async function exportPipelineTableViewCsv(
+  options: ExportPipelineTableViewOptions,
+): Promise<number> {
+  return invoke<number>(
+    "export_pipeline_table_view_csv",
+    {
+      jobId: options.jobId,
+      resultId: options.resultId,
+      columns: options.columns,
+      filters: options.filters,
+      sortBy: options.sortBy,
+      sortDirection: options.sortDirection,
+      filename: options.filename,
+      destinationPath: options.destinationPath,
+    },
+  );
+}

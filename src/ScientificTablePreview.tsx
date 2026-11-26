@@ -4,6 +4,9 @@ import {
   useState,
 } from "react";
 import {
+  save,
+} from "@tauri-apps/plugin-dialog";
+import {
   fetchPipelineTablePreview,
   type PipelineResultEntry,
   type PipelineTableFilter,
@@ -22,7 +25,10 @@ import {
   tableViewsForResult,
   type SavedTableView,
 } from "./tableViews";
-import type { BackendStatus } from "./backend";
+import {
+  exportPipelineTableViewCsv,
+  type BackendStatus,
+} from "./backend";
 
 const PAGE_SIZE = 50;
 const DEFAULT_VISIBLE_COLUMNS = 8;
@@ -103,6 +109,16 @@ export function ScientificTablePreview({
 
   const requestedFiltersKey =
     JSON.stringify(requestedFilters);
+
+  const [
+    csvExportPending,
+    setCsvExportPending,
+  ] = useState(false);
+
+  const [
+    csvExportMessage,
+    setCsvExportMessage,
+  ] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
 
@@ -244,6 +260,79 @@ export function ScientificTablePreview({
       ) ?? [],
     [preview],
   );
+
+  function suggestedCsvFilename(): string {
+    const baseName = result.title
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    return `${
+      baseName || result.id
+    }-vue.csv`;
+  }
+
+  async function exportCurrentViewCsv() {
+    if (
+      csvExportPending ||
+      loading ||
+      selectedColumns.length === 0
+    ) {
+      return;
+    }
+
+    setCsvExportPending(true);
+    setCsvExportMessage(null);
+    setError(null);
+
+    try {
+      const proposedFilename =
+        suggestedCsvFilename();
+
+      const destinationPath = await save({
+        title: "Exporter la vue tabulaire en CSV",
+        defaultPath: proposedFilename,
+        filters: [
+          {
+            name: "Table CSV",
+            extensions: ["csv"],
+          },
+        ],
+      });
+
+      if (!destinationPath) {
+        return;
+      }
+
+      const writtenBytes =
+        await exportPipelineTableViewCsv({
+          jobId,
+          resultId: result.id,
+          columns: selectedColumns,
+          filters: appliedFilters,
+          sortBy,
+          sortDirection,
+          filename: proposedFilename,
+          destinationPath,
+        });
+
+      setCsvExportMessage(
+        `Vue CSV exportée : ${writtenBytes.toLocaleString(
+          "fr-FR",
+        )} octets`,
+      );
+    } catch (exportError) {
+      setError(
+        `Export CSV impossible : ${String(
+          exportError,
+        )}`,
+      );
+    } finally {
+      setCsvExportPending(false);
+    }
+  }
 
   function applySavedView(
     view: SavedTableView,
@@ -467,6 +556,27 @@ export function ScientificTablePreview({
 
           <button
             type="button"
+            className="scientific-table-export-view"
+            disabled={
+              loading ||
+              csvExportPending ||
+              selectedColumns.length === 0
+            }
+            title={
+              "Exporter toutes les lignes correspondant " +
+              "aux colonnes, filtres et tri actifs"
+            }
+            onClick={() =>
+              void exportCurrentViewCsv()
+            }
+          >
+            {csvExportPending
+              ? "Export CSV…"
+              : "Exporter la vue CSV"}
+          </button>
+
+          <button
+            type="button"
             disabled={
               loading ||
               !preview ||
@@ -499,6 +609,12 @@ export function ScientificTablePreview({
           </button>
         </div>
       </header>
+
+      {csvExportMessage && (
+        <div className="scientific-table-export-success">
+          {csvExportMessage}
+        </div>
+      )}
 
       {viewEditorOpen &&
         availableColumns.length > 0 && (

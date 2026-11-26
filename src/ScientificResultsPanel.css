@@ -962,3 +962,26 @@
     flex-direction: column;
   }
 }
+
+.scientific-table-toolbar-actions
+.scientific-table-export-view {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.scientific-table-toolbar-actions
+.scientific-table-export-view:hover:not(:disabled) {
+  border-color: #115e59;
+  background: #115e59;
+  color: #ffffff;
+}
+
+.scientific-table-export-success {
+  border-bottom: 1px solid #a7f3d0;
+  padding: 8px 12px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 11px;
+  font-weight: 700;
+}

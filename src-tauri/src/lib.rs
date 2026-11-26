@@ -16,6 +16,8 @@ use std::{
 };
 
 use tauri::Manager;
+use tokio::io::AsyncWriteExt;
+
 use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::{
     ShellExt,
@@ -862,6 +864,218 @@ fn open_pipeline_file(
         .map_err(|error| format!("Impossible d'ouvrir le fichier : {error}"))
 }
 
+fn validate_api_identifier(value: &str, label: &str) -> Result<(), String> {
+    if value.is_empty()
+        || !value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '-' || character == '_'
+        })
+    {
+        return Err(format!("{label} contient des caractères invalides."));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn export_pipeline_table_view_csv(
+    state: tauri::State<'_, PipelineBackendState>,
+    job_id: String,
+    result_id: String,
+    columns: Vec<String>,
+    filters: Vec<serde_json::Value>,
+    sort_by: Option<String>,
+    sort_direction: Option<String>,
+    filename: String,
+    destination_path: String,
+) -> Result<u64, String> {
+    validate_api_identifier(&job_id, "L'identifiant du job")?;
+    validate_api_identifier(&result_id, "L'identifiant du résultat")?;
+
+    if columns.is_empty() {
+        return Err("Au moins une colonne doit être exportée.".to_string());
+    }
+
+    if columns.len() > 200 {
+        return Err("Un maximum de 200 colonnes est autorisé.".to_string());
+    }
+
+    if filters.len() > 20 {
+        return Err("Un maximum de 20 filtres est autorisé.".to_string());
+    }
+
+    if let Some(column) = &sort_by {
+        validate_api_identifier(column, "La colonne de tri")?;
+    }
+
+    if let Some(direction) = &sort_direction {
+        if direction != "asc" && direction != "desc" {
+            return Err("La direction de tri doit être asc ou desc.".to_string());
+        }
+    }
+
+    let destination_file = PathBuf::from(destination_path);
+
+    let extension_is_csv = destination_file
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("csv"))
+        .unwrap_or(false);
+
+    if !extension_is_csv {
+        return Err("Le fichier d'export doit porter ".to_string() + "l'extension .csv.");
+    }
+
+    let parent_directory = destination_file
+        .parent()
+        .ok_or_else(|| "Le dossier de destination est invalide.".to_string())?;
+
+    tokio::fs::create_dir_all(parent_directory)
+        .await
+        .map_err(|error| {
+            format!(
+                "Impossible de créer le dossier {} : {error}",
+                parent_directory.display()
+            )
+        })?;
+
+    let destination_name = destination_file
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "Le nom du fichier CSV est invalide.".to_string())?;
+
+    let temporary_file = parent_directory.join(format!(".{destination_name}.exporting"));
+
+    let (base_url, token) = {
+        let process_guard = state
+            .process
+            .lock()
+            .map_err(|_| "État du backend local inaccessible.".to_string())?;
+
+        let process = process_guard
+            .as_ref()
+            .ok_or_else(|| "Le moteur local n'est pas démarré.".to_string())?;
+
+        (
+            process.connection.base_url.clone(),
+            process.connection.token.clone(),
+        )
+    };
+
+    let endpoint = format!(
+        "{}/api/v1/jobs/{}/tables/{}/export.csv",
+        base_url.trim_end_matches('/'),
+        job_id,
+        result_id,
+    );
+
+    let mut url = reqwest::Url::parse(&endpoint)
+        .map_err(|error| format!("URL d'export CSV invalide : {error}"))?;
+
+    {
+        let mut query = url.query_pairs_mut();
+
+        query.append_pair("columns", &columns.join(","));
+
+        if !filters.is_empty() {
+            let serialized_filters = serde_json::to_string(&filters)
+                .map_err(|error| format!("Filtres d'export invalides : {error}"))?;
+
+            query.append_pair("filters", &serialized_filters);
+        }
+
+        if let Some(column) = &sort_by {
+            query.append_pair("sort_by", column);
+        }
+
+        if let Some(direction) = &sort_direction {
+            query.append_pair("sort_direction", direction);
+        }
+
+        query.append_pair("filename", &filename);
+    }
+
+    let client = reqwest::Client::new();
+
+    let mut response = client
+        .get(url)
+        .bearer_auth(token)
+        .send()
+        .await
+        .map_err(|error| format!("Impossible de contacter le moteur : {error}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+
+        let detail = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Réponse d'erreur illisible.".to_string());
+
+        return Err(format!(
+            "Export CSV refusé par le moteur ({status}) : {detail}"
+        ));
+    }
+
+    let mut temporary_stream = tokio::fs::File::create(&temporary_file)
+        .await
+        .map_err(|error| format!("Impossible de créer {} : {error}", temporary_file.display()))?;
+
+    let mut written_bytes: u64 = 0;
+
+    loop {
+        let chunk = match response.chunk().await {
+            Ok(Some(chunk)) => chunk,
+            Ok(None) => break,
+            Err(error) => {
+                drop(temporary_stream);
+
+                let _ = tokio::fs::remove_file(&temporary_file).await;
+
+                return Err(format!("Téléchargement CSV interrompu : {error}"));
+            }
+        };
+
+        if let Err(error) = temporary_stream.write_all(&chunk).await {
+            drop(temporary_stream);
+
+            let _ = tokio::fs::remove_file(&temporary_file).await;
+
+            return Err(format!("Impossible d'écrire l'export CSV : {error}"));
+        }
+
+        written_bytes += chunk.len() as u64;
+    }
+
+    temporary_stream
+        .flush()
+        .await
+        .map_err(|error| format!("Impossible de finaliser le fichier temporaire : {error}"))?;
+
+    drop(temporary_stream);
+
+    if destination_file.exists() {
+        if let Err(error) = tokio::fs::remove_file(&destination_file).await {
+            let _ = tokio::fs::remove_file(&temporary_file).await;
+
+            return Err(format!(
+                "Impossible de remplacer {} : {error}",
+                destination_file.display()
+            ));
+        }
+    }
+
+    if let Err(error) = tokio::fs::rename(&temporary_file, &destination_file).await {
+        let _ = tokio::fs::remove_file(&temporary_file).await;
+
+        return Err(format!(
+            "Impossible de finaliser l'export vers {} : {error}",
+            destination_file.display()
+        ));
+    }
+
+    Ok(written_bytes)
+}
+
 #[tauri::command]
 async fn export_pipeline_file(
     state: tauri::State<'_, PipelineBackendState>,
@@ -963,6 +1177,7 @@ pub fn run() {
             read_pipeline_preset,
             write_pipeline_preset,
             open_pipeline_file,
+            export_pipeline_table_view_csv,
             export_pipeline_file,
         ])
         .build(tauri::generate_context!())
