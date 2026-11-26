@@ -30,7 +30,7 @@ import {
   type BackendStatus,
 } from "./backend";
 
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 50;
 const DEFAULT_VISIBLE_COLUMNS = 8;
 
 type ScientificTablePreviewProps = {
@@ -74,6 +74,9 @@ export function ScientificTablePreview({
     useState<PipelineTablePreview | null>(null);
 
   const [offset, setOffset] = useState(0);
+
+  const [pageSize, setPageSize] =
+    useState(DEFAULT_PAGE_SIZE);
 
   const [sortBy, setSortBy] =
     useState<string | null>(null);
@@ -139,6 +142,7 @@ export function ScientificTablePreview({
 
   useEffect(() => {
     setOffset(0);
+    setPageSize(DEFAULT_PAGE_SIZE);
     setSortBy(null);
     setSortDirection(null);
     setSelectedColumns([]);
@@ -169,7 +173,7 @@ export function ScientificTablePreview({
             result.id,
             {
               offset,
-              limit: PAGE_SIZE,
+              limit: pageSize,
               columns:
                 availableColumns.length > 0 &&
                 selectedColumns.length > 0
@@ -226,6 +230,7 @@ export function ScientificTablePreview({
     result.id,
     result.kind,
     offset,
+    pageSize,
     selectedColumns,
     availableColumns.length,
     sortBy,
@@ -243,13 +248,13 @@ export function ScientificTablePreview({
   );
 
   const pageNumber = Math.floor(
-    offset / PAGE_SIZE,
+    offset / pageSize,
   ) + 1;
 
   const pageCount = preview
     ? Math.max(
         1,
-        Math.ceil(preview.total / PAGE_SIZE),
+        Math.ceil(preview.total / pageSize),
       )
     : 1;
 
@@ -368,6 +373,11 @@ export function ScientificTablePreview({
     );
 
     setAppliedFilters(validFilters);
+    setPageSize(
+      [25, 50, 100].includes(view.pageSize)
+        ? view.pageSize
+        : DEFAULT_PAGE_SIZE,
+    );
     setSortBy(validSortBy);
     setSortDirection(
       validSortBy
@@ -393,7 +403,7 @@ export function ScientificTablePreview({
         appliedFilters,
         sortBy,
         sortDirection,
-        PAGE_SIZE,
+        pageSize,
       );
 
       const updatedViews = [
@@ -575,6 +585,25 @@ export function ScientificTablePreview({
               : "Exporter la vue CSV"}
           </button>
 
+          <label className="scientific-page-size">
+            <span>Lignes</span>
+
+            <select
+              value={pageSize}
+              disabled={loading}
+              onChange={(event) => {
+                setPageSize(
+                  Number(event.target.value),
+                );
+                setOffset(0);
+              }}
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </label>
+
           <button
             type="button"
             disabled={
@@ -584,7 +613,7 @@ export function ScientificTablePreview({
             }
             onClick={() =>
               setOffset((current) =>
-                Math.max(0, current - PAGE_SIZE),
+                Math.max(0, current - pageSize),
               )
             }
           >
@@ -601,7 +630,7 @@ export function ScientificTablePreview({
             onClick={() =>
               setOffset(
                 (current) =>
-                  current + PAGE_SIZE,
+                  current + pageSize,
               )
             }
           >
@@ -817,7 +846,7 @@ export function ScientificTablePreview({
           –{preview.offset + preview.returned} sur{" "}
           {preview.total.toLocaleString("fr-FR")}
           {" · "}
-          maximum {PAGE_SIZE} lignes par page
+          maximum {pageSize} lignes par page
         </footer>
       )}
     </div>

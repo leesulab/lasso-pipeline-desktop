@@ -985,3 +985,22 @@
   font-size: 11px;
   font-weight: 700;
 }
+
+.scientific-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.scientific-page-size select {
+  min-height: 30px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: 4px 6px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 11px;
+}
