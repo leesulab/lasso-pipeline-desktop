@@ -19,6 +19,10 @@ import {
   ScientificTableViews,
 } from "./ScientificTableViews";
 import {
+  exportTableViewsFile,
+  importTableViewsFile,
+} from "./tableViewFileActions";
+import {
   createUserTableView,
   loadUserTableViews,
   saveUserTableViews,
@@ -109,6 +113,16 @@ export function ScientificTablePreview({
     useState<SavedTableView[]>(
       () => loadUserTableViews(),
     );
+
+  const [
+    tableViewsTransferPending,
+    setTableViewsTransferPending,
+  ] = useState(false);
+
+  const [
+    tableViewsTransferMessage,
+    setTableViewsTransferMessage,
+  ] = useState<string | null>(null);
 
   const [appliedFilters, setAppliedFilters] =
     useState<PipelineTableFilter[]>([]);
@@ -371,6 +385,80 @@ export function ScientificTablePreview({
       );
     } finally {
       setCsvExportPending(false);
+    }
+  }
+
+  async function importSavedViews() {
+    if (tableViewsTransferPending) {
+      return;
+    }
+
+    setTableViewsTransferPending(true);
+    setTableViewsTransferMessage(null);
+    setError(null);
+
+    try {
+      const imported =
+        await importTableViewsFile(
+          userViews,
+        );
+
+      if (!imported) {
+        return;
+      }
+
+      const updatedViews = [
+        ...userViews,
+        ...imported.importedViews,
+      ];
+
+      saveUserTableViews(updatedViews);
+      setUserViews(updatedViews);
+
+      setTableViewsTransferMessage(
+        `${imported.importedViews.length} vue(s) importée(s)`,
+      );
+    } catch (importError) {
+      setError(
+        `Import des vues impossible : ${String(
+          importError,
+        )}`,
+      );
+    } finally {
+      setTableViewsTransferPending(false);
+    }
+  }
+
+  async function exportSavedViews() {
+    if (tableViewsTransferPending) {
+      return;
+    }
+
+    setTableViewsTransferPending(true);
+    setTableViewsTransferMessage(null);
+    setError(null);
+
+    try {
+      const destination =
+        await exportTableViewsFile(
+          userViews,
+        );
+
+      if (!destination) {
+        return;
+      }
+
+      setTableViewsTransferMessage(
+        `${userViews.length} vue(s) utilisateur exportée(s)`,
+      );
+    } catch (exportError) {
+      setError(
+        `Export des vues impossible : ${String(
+          exportError,
+        )}`,
+      );
+    } finally {
+      setTableViewsTransferPending(false);
     }
   }
 
@@ -736,6 +824,18 @@ export function ScientificTablePreview({
             activeView={activeView}
             activeViewModified={
               activeViewModified
+            }
+            transferPending={
+              tableViewsTransferPending
+            }
+            transferMessage={
+              tableViewsTransferMessage
+            }
+            onImport={() =>
+              void importSavedViews()
+            }
+            onExport={() =>
+              void exportSavedViews()
             }
             onDelete={deleteSavedView}
           />

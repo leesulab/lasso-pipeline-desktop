@@ -1,7 +1,9 @@
 import {
   BookmarkPlus,
+  Download,
   Play,
   Trash2,
+  Upload,
 } from "lucide-react";
 import type {
   SavedTableView,
@@ -17,6 +19,10 @@ type ScientificTableViewsProps = {
   onUpdate: () => void;
   activeView: SavedTableView | null;
   activeViewModified: boolean;
+  transferPending: boolean;
+  transferMessage: string | null;
+  onImport: () => void;
+  onExport: () => void;
   onDelete: (viewId: string) => void;
 };
 
@@ -30,10 +36,40 @@ export function ScientificTableViews({
   onUpdate,
   activeView,
   activeViewModified,
+  transferPending,
+  transferMessage,
+  onImport,
+  onExport,
   onDelete,
 }: ScientificTableViewsProps) {
   return (
     <div className="scientific-table-views">
+      <div className="scientific-table-transfer">
+        <div>
+          <button
+            type="button"
+            disabled={disabled || transferPending}
+            onClick={onImport}
+          >
+            <Upload size={14} />
+            Importer des vues
+          </button>
+
+          <button
+            type="button"
+            disabled={disabled || transferPending}
+            onClick={onExport}
+          >
+            <Download size={14} />
+            Exporter mes vues
+          </button>
+        </div>
+
+        {transferMessage && (
+          <span>{transferMessage}</span>
+        )}
+      </div>
+
       <div className="scientific-table-view-list">
         {views.length === 0 && (
           <div className="scientific-results-empty">
