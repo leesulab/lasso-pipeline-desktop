@@ -1,6 +1,8 @@
 import {
   BookmarkPlus,
+  Copy,
   Download,
+  Pencil,
   Play,
   Trash2,
   Upload,
@@ -23,6 +25,8 @@ type ScientificTableViewsProps = {
   transferMessage: string | null;
   onImport: () => void;
   onExport: () => void;
+  onRename: (view: SavedTableView) => void;
+  onDuplicate: (view: SavedTableView) => void;
   onDelete: (viewId: string) => void;
 };
 
@@ -40,6 +44,8 @@ export function ScientificTableViews({
   transferMessage,
   onImport,
   onExport,
+  onRename,
+  onDuplicate,
   onDelete,
 }: ScientificTableViewsProps) {
   return (
@@ -113,6 +119,30 @@ export function ScientificTableViews({
                 <Play size={13} />
                 Appliquer
               </button>
+
+              <button
+                type="button"
+                disabled={disabled}
+                title="Dupliquer cette vue"
+                onClick={() =>
+                  onDuplicate(view)
+                }
+              >
+                <Copy size={13} />
+              </button>
+
+              {!view.builtIn && (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  title="Renommer cette vue"
+                  onClick={() =>
+                    onRename(view)
+                  }
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
 
               {!view.builtIn && (
                 <button

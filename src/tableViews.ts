@@ -380,7 +380,7 @@ export function serializeTableViewsFile(
   return JSON.stringify(file, null, 2);
 }
 
-function uniqueImportedName(
+export function uniqueTableViewName(
   requestedName: string,
   existingNames: Set<string>,
 ): string {
@@ -468,7 +468,7 @@ export function parseTableViewsFile(
   const importTimestamp = Date.now();
 
   return file.views.map((view, index) => {
-    const name = uniqueImportedName(
+    const name = uniqueTableViewName(
       view.name,
       existingNames,
     );
@@ -494,4 +494,98 @@ export function parseTableViewsFile(
       ),
     };
   });
+}
+
+export function renameUserTableView(
+  views: SavedTableView[],
+  viewId: string,
+  requestedName: string,
+): SavedTableView[] {
+  const view = views.find(
+    (candidate) => candidate.id === viewId,
+  );
+
+  if (!view) {
+    throw new Error(
+      "La vue à renommer est introuvable.",
+    );
+  }
+
+  if (view.builtIn) {
+    throw new Error(
+      "Une vue intégrée ne peut pas être renommée.",
+    );
+  }
+
+  const trimmedName = requestedName.trim();
+
+  if (!trimmedName) {
+    throw new Error(
+      "Le nom de la vue est obligatoire.",
+    );
+  }
+
+  if (trimmedName.length > 80) {
+    throw new Error(
+      "Le nom de la vue ne peut pas dépasser "
+      + "80 caractères.",
+    );
+  }
+
+  const existingNames = new Set(
+    views
+      .filter(
+        (candidate) =>
+          candidate.id !== viewId,
+      )
+      .map((candidate) => candidate.name),
+  );
+
+  const uniqueName = uniqueTableViewName(
+    trimmedName,
+    existingNames,
+  );
+
+  return views.map((candidate) =>
+    candidate.id === viewId
+      ? {
+          ...candidate,
+          name: uniqueName,
+        }
+      : candidate,
+  );
+}
+
+export function duplicateTableView(
+  source: SavedTableView,
+  userViews: SavedTableView[],
+): SavedTableView {
+  const existingNames = new Set(
+    [
+      ...builtInTableViews,
+      ...userViews,
+    ].map((view) => view.name),
+  );
+
+  const duplicatedName = uniqueTableViewName(
+    `${source.name} - copie`,
+    existingNames,
+  );
+
+  return {
+    ...source,
+    version: VIEW_VERSION,
+    id: (
+      `user-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`
+    ),
+    name: duplicatedName,
+    builtIn: false,
+    createdAt: new Date().toISOString(),
+    columns: [...source.columns],
+    filters: source.filters.map((filter) => ({
+      ...filter,
+    })),
+  };
 }

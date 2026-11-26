@@ -24,7 +24,9 @@ import {
 } from "./tableViewFileActions";
 import {
   createUserTableView,
+  duplicateTableView,
   loadUserTableViews,
+  renameUserTableView,
   saveUserTableViews,
   tableViewsForResult,
   type SavedTableView,
@@ -545,6 +547,70 @@ export function ScientificTablePreview({
     }
   }
 
+  function renameSavedView(
+    view: SavedTableView,
+  ) {
+    if (view.builtIn) {
+      return;
+    }
+
+    const requestedName = window.prompt(
+      "Nouveau nom de la vue",
+      view.name,
+    );
+
+    if (requestedName === null) {
+      return;
+    }
+
+    try {
+      const updatedViews =
+        renameUserTableView(
+          userViews,
+          view.id,
+          requestedName,
+        );
+
+      saveUserTableViews(updatedViews);
+      setUserViews(updatedViews);
+      setError(null);
+    } catch (renameError) {
+      setError(
+        `Renommage impossible : ${String(
+          renameError,
+        )}`,
+      );
+    }
+  }
+
+  function duplicateSavedView(
+    view: SavedTableView,
+  ) {
+    try {
+      const duplicatedView =
+        duplicateTableView(
+          view,
+          userViews,
+        );
+
+      const updatedViews = [
+        ...userViews,
+        duplicatedView,
+      ];
+
+      saveUserTableViews(updatedViews);
+      setUserViews(updatedViews);
+      applySavedView(duplicatedView);
+      setError(null);
+    } catch (duplicateError) {
+      setError(
+        `Duplication impossible : ${String(
+          duplicateError,
+        )}`,
+      );
+    }
+  }
+
   function updateActiveView() {
     if (!activeView || activeView.builtIn) {
       return;
@@ -837,6 +903,8 @@ export function ScientificTablePreview({
             onExport={() =>
               void exportSavedViews()
             }
+            onRename={renameSavedView}
+            onDuplicate={duplicateSavedView}
             onDelete={deleteSavedView}
           />
         )}
