@@ -102,6 +102,9 @@ export function ScientificTablePreview({
   const [viewName, setViewName] =
     useState("");
 
+  const [activeViewId, setActiveViewId] =
+    useState<string | null>(null);
+
   const [userViews, setUserViews] =
     useState<SavedTableView[]>(
       () => loadUserTableViews(),
@@ -143,6 +146,7 @@ export function ScientificTablePreview({
   useEffect(() => {
     setOffset(0);
     setPageSize(DEFAULT_PAGE_SIZE);
+    setActiveViewId(null);
     setSortBy(null);
     setSortDirection(null);
     setSelectedColumns([]);
@@ -246,6 +250,37 @@ export function ScientificTablePreview({
       ),
     [result.id, userViews],
   );
+
+  const activeView = useMemo(
+    () =>
+      availableViews.find(
+        (view) => view.id === activeViewId,
+      ) ?? null,
+    [activeViewId, availableViews],
+  );
+
+  const activeViewModified = useMemo(() => {
+    if (!activeView) {
+      return false;
+    }
+
+    return (
+      JSON.stringify(activeView.columns) !==
+        JSON.stringify(selectedColumns) ||
+      JSON.stringify(activeView.filters) !==
+        JSON.stringify(appliedFilters) ||
+      activeView.sortBy !== sortBy ||
+      activeView.sortDirection !== sortDirection ||
+      activeView.pageSize !== pageSize
+    );
+  }, [
+    activeView,
+    selectedColumns,
+    appliedFilters,
+    sortBy,
+    sortDirection,
+    pageSize,
+  ]);
 
   const pageNumber = Math.floor(
     offset / pageSize,
@@ -391,6 +426,7 @@ export function ScientificTablePreview({
     );
     setColumnSelectorOpen(false);
     setViewEditorOpen(false);
+    setActiveViewId(view.id);
     setError(null);
   }
 
@@ -413,11 +449,39 @@ export function ScientificTablePreview({
 
       saveUserTableViews(updatedViews);
       setUserViews(updatedViews);
+      setActiveViewId(view.id);
       setViewName("");
       setError(null);
     } catch (saveError) {
       setError(String(saveError));
     }
+  }
+
+  function updateActiveView() {
+    if (!activeView || activeView.builtIn) {
+      return;
+    }
+
+    const updatedViews = userViews.map((view) =>
+      view.id === activeView.id
+        ? {
+            ...view,
+            columns: [...selectedColumns],
+            filters: appliedFilters.map(
+              (filter) => ({
+                ...filter,
+              }),
+            ),
+            sortBy,
+            sortDirection,
+            pageSize,
+          }
+        : view,
+    );
+
+    saveUserTableViews(updatedViews);
+    setUserViews(updatedViews);
+    setError(null);
   }
 
   function deleteSavedView(viewId: string) {
@@ -427,6 +491,10 @@ export function ScientificTablePreview({
 
     saveUserTableViews(updatedViews);
     setUserViews(updatedViews);
+
+    if (activeViewId === viewId) {
+      setActiveViewId(null);
+    }
   }
 
   function cycleSort(columnName: string) {
@@ -505,6 +573,16 @@ export function ScientificTablePreview({
           {preview && (
             <span>
               Page {pageNumber} sur {pageCount}
+            </span>
+          )}
+
+          {activeView && (
+            <span className="scientific-active-view">
+              Vue active :{" "}
+              <strong>{activeView.name}</strong>
+              {activeViewModified && (
+                <em> · modifiée</em>
+              )}
             </span>
           )}
         </div>
@@ -654,6 +732,11 @@ export function ScientificTablePreview({
             onViewNameChange={setViewName}
             onApply={applySavedView}
             onSave={saveCurrentView}
+            onUpdate={updateActiveView}
+            activeView={activeView}
+            activeViewModified={
+              activeViewModified
+            }
             onDelete={deleteSavedView}
           />
         )}

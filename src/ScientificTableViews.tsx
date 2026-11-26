@@ -14,6 +14,9 @@ type ScientificTableViewsProps = {
   onViewNameChange: (name: string) => void;
   onApply: (view: SavedTableView) => void;
   onSave: () => void;
+  onUpdate: () => void;
+  activeView: SavedTableView | null;
+  activeViewModified: boolean;
   onDelete: (viewId: string) => void;
 };
 
@@ -24,6 +27,9 @@ export function ScientificTableViews({
   onViewNameChange,
   onApply,
   onSave,
+  onUpdate,
+  activeView,
+  activeViewModified,
   onDelete,
 }: ScientificTableViewsProps) {
   return (
@@ -89,6 +95,24 @@ export function ScientificTableViews({
           </article>
         ))}
       </div>
+
+      {activeView &&
+        !activeView.builtIn &&
+        activeViewModified && (
+          <div className="scientific-table-view-update">
+            <span>
+              La vue « {activeView.name} » a été modifiée.
+            </span>
+
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onUpdate}
+            >
+              Mettre à jour la vue
+            </button>
+          </div>
+        )}
 
       <div className="scientific-table-view-save">
         <label htmlFor="scientific-table-view-name">
