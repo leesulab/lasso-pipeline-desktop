@@ -9,12 +9,19 @@ import {
 import {
   fetchPipelineTablePreview,
   type PipelineResultEntry,
+  type PipelineTableCell,
   type PipelineTableFilter,
   type PipelineTablePreview,
 } from "./api";
 import {
   ScientificTableFilters,
 } from "./ScientificTableFilters";
+import {
+  ScientificCellInspector,
+} from "./ScientificCellInspector";
+import {
+  ScientificRowInspector,
+} from "./ScientificRowInspector";
 import {
   ScientificTableViews,
 } from "./ScientificTableViews";
@@ -78,6 +85,23 @@ export function ScientificTablePreview({
 }: ScientificTablePreviewProps) {
   const [preview, setPreview] =
     useState<PipelineTablePreview | null>(null);
+
+  const [
+    inspectedCell,
+    setInspectedCell,
+  ] = useState<{
+    columnName: string;
+    columnType: string;
+    value: PipelineTableCell;
+  } | null>(null);
+
+  const [
+    inspectedRow,
+    setInspectedRow,
+  ] = useState<{
+    row: Record<string, PipelineTableCell>;
+    rowNumber: number;
+  } | null>(null);
 
   const [offset, setOffset] = useState(0);
 
@@ -161,6 +185,8 @@ export function ScientificTablePreview({
 
   useEffect(() => {
     setOffset(0);
+    setInspectedCell(null);
+    setInspectedRow(null);
     setPageSize(DEFAULT_PAGE_SIZE);
     setActiveViewId(null);
     setSortBy(null);
@@ -315,6 +341,24 @@ export function ScientificTablePreview({
         (column) => column.name,
       ) ?? [],
     [preview],
+  );
+
+  const visibleColumns = useMemo(
+    () =>
+      visibleColumnNames.map(
+        (columnName) =>
+          preview?.columns.find(
+            (column) =>
+              column.name === columnName,
+          ) ?? {
+            name: columnName,
+            type: "inconnu",
+          },
+      ),
+    [
+      preview,
+      visibleColumnNames,
+    ],
   );
 
   function suggestedCsvFilename(): string {
@@ -993,6 +1037,14 @@ export function ScientificTablePreview({
           <table>
             <thead>
               <tr>
+                <th
+                  className={
+                    "scientific-row-details-header"
+                  }
+                >
+                  Détails
+                </th>
+
                 {visibleColumnNames.map(
                   (columnName) => {
                     const column =
@@ -1058,13 +1110,64 @@ export function ScientificTablePreview({
                   <tr
                     key={`${offset}-${rowIndex}`}
                   >
+                    <td
+                      className={
+                        "scientific-row-details-cell"
+                      }
+                    >
+                      <button
+                        type="button"
+                        title={
+                          "Afficher toutes les valeurs " +
+                          "de cette ligne"
+                        }
+                        onClick={() =>
+                          setInspectedRow({
+                            row,
+                            rowNumber:
+                              offset +
+                              rowIndex +
+                              1,
+                          })
+                        }
+                      >
+                        Voir
+                      </button>
+                    </td>
+
                     {visibleColumnNames.map(
                       (columnName) => (
                         <td key={columnName}>
-                          {formatCell(
-                            row[columnName] ??
-                              null,
-                          )}
+                          <button
+                            type="button"
+                            className="scientific-cell-button"
+                            title={
+                              "Afficher la valeur complète"
+                            }
+                            onClick={() => {
+                              const column =
+                                preview.columns.find(
+                                  (item) =>
+                                    item.name ===
+                                    columnName,
+                                );
+
+                              setInspectedCell({
+                                columnName,
+                                columnType:
+                                  column?.type ??
+                                  "inconnu",
+                                value:
+                                  row[columnName] ??
+                                  null,
+                              });
+                            }}
+                          >
+                            {formatCell(
+                              row[columnName] ??
+                                null,
+                            )}
+                          </button>
                         </td>
                       ),
                     )}
@@ -1086,6 +1189,32 @@ export function ScientificTablePreview({
             </div>
           )}
         </div>
+      )}
+
+      {inspectedRow && (
+        <ScientificRowInspector
+          columns={visibleColumns}
+          row={inspectedRow.row}
+          rowNumber={inspectedRow.rowNumber}
+          onClose={() =>
+            setInspectedRow(null)
+          }
+        />
+      )}
+
+      {inspectedCell && (
+        <ScientificCellInspector
+          columnName={
+            inspectedCell.columnName
+          }
+          columnType={
+            inspectedCell.columnType
+          }
+          value={inspectedCell.value}
+          onClose={() =>
+            setInspectedCell(null)
+          }
+        />
       )}
 
       {preview && (
